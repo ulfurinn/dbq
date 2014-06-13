@@ -36,9 +36,9 @@ var _ = Describe("dbq", func() {
 	})
 
 	Describe("Select", func() {
+		var s *SelectExpr
 
 		Context("()", func() {
-			var s *SelectExpr
 			BeforeEach(func() {
 				s = q.Select()
 			})
@@ -47,6 +47,22 @@ var _ = Describe("dbq", func() {
 			})
 			It("should select all", func() {
 				Expect(s.isSelectStar()).To(Equal(true))
+			})
+		})
+
+		Describe("From()", func() {
+			It("should add a table to the FROM clause", func() {
+				s = q.Select().From("t")
+				Expect(s.String()).To(Equal("SELECT * FROM t"))
+			})
+			It("should add a table with an alias to the FROM clause", func() {
+				s = q.Select().From(Alias("table", "t"))
+				Expect(s.String()).To(Equal("SELECT * FROM table AS t"))
+			})
+			It("should add a subquery to the FROM clause", func() {
+				s1 := q.Select().From("t")
+				s = q.Select().From(Alias(s1, "s"))
+				Expect(s.String()).To(Equal("SELECT * FROM (SELECT * FROM t) AS s"))
 			})
 		})
 

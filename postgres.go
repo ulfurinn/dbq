@@ -15,11 +15,7 @@ func (PostgresDialect) SelectString(s *SelectExpr) string {
 		q += "FROM "
 		tables := []string{}
 		for _, table := range s.tables {
-			clause := table.table.tableExpr()
-			if table.alias != "" {
-				clause += " AS " + table.alias
-			}
-			tables = append(tables, clause)
+			tables = append(tables, table.String())
 		}
 		q += strings.Join(tables, ", ")
 	}

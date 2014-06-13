@@ -2,6 +2,7 @@ package dbq
 
 import (
 	"database/sql"
+	"fmt"
 
 	_ "github.com/lib/pq"
 )
@@ -11,8 +12,16 @@ type Dbq struct {
 	db *sql.DB
 }
 
-type aliasSpec struct {
-	expr  interface{}
+type Expr interface {
+	String() string
+}
+
+type Tabular interface {
+	Col(c string) Expr
+}
+
+type AliasSpec struct {
+	expr  Expr
 	alias string
 }
 
@@ -20,16 +29,16 @@ type Identifier struct {
 	id string
 }
 
-type Subquery struct {
-	q *SelectExpr
+type Subexpr struct {
+	expr Expr
 }
 
-func (id Identifier) tableExpr() string {
+func (id Identifier) String() string {
 	return id.id
 }
 
-func (q Subquery) tableExpr() string {
-	return q.q.String()
+func (e Subexpr) String() string {
+	return "(" + e.expr.String() + ")"
 }
 
 func New(db *sql.DB, d dialect) *Dbq {
@@ -44,6 +53,17 @@ func (q *Dbq) Select(selectSpec ...interface{}) *SelectExpr {
 	return stmt.parseSelectSpec(selectSpec...)
 }
 
-func Alias(id, a string) aliasSpec {
-	return aliasSpec{expr: Identifier{id}, alias: a}
+func Alias(expr interface{}, a string) AliasSpec {
+	switch expr := expr.(type) {
+	case string:
+		return AliasSpec{expr: Identifier{expr}, alias: a}
+	case Expr:
+		return AliasSpec{expr: Subexpr{expr}, alias: a}
+	default:
+		panic(fmt.Sprintf("%v does not implement Expr", expr))
+	}
+}
+
+func (a AliasSpec) String() string {
+	return a.expr.String() + " AS " + a.alias
 }

@@ -3,18 +3,13 @@ package dbq
 type selectColumnSpec struct{}
 
 type tableExprSpec interface {
-	tableExpr() string
-}
-
-type selectTableSpec struct {
-	table tableExprSpec
-	alias string
+	Expr
 }
 
 type SelectExpr struct {
 	q       *Dbq
 	columns []selectColumnSpec
-	tables  []selectTableSpec
+	tables  []Expr
 }
 
 func (s *SelectExpr) parseSelectSpec(spec ...interface{}) *SelectExpr {
@@ -33,24 +28,15 @@ func (s *SelectExpr) From(tableSpecs ...interface{}) *SelectExpr {
 }
 
 func (s *SelectExpr) parseTableSpec(spec interface{}) {
-	var ts selectTableSpec
+	var ts Expr
 	var parsed bool
 	switch spec := spec.(type) {
 	case string:
 		parsed = true
-		ts.table = Identifier{spec}
-		ts.alias = ""
+		ts = Identifier{spec}
 	case aliasSpec:
-		switch expr := spec.expr.(type) {
-		case *SelectExpr:
-			parsed = true
-			ts.table = Subquery{expr}
-			ts.alias = spec.alias
-		case Identifier:
-			parsed = true
-			ts.table = Identifier{expr.id}
-			ts.alias = spec.alias
-		}
+		parsed = true
+		ts = spec
 	}
 	if parsed {
 		s.tables = append(s.tables, ts)
