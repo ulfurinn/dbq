@@ -71,11 +71,11 @@ type Named interface {
 
 type Tabular interface {
 	Named
-	Col(c string) Expr
+	Col(c string) Expression
 }
 
 type AliasSpec struct {
-	Expr
+	Expression
 	source Node
 }
 
@@ -121,7 +121,7 @@ func (id Identifier) Name() string {
 	return string(id)
 }
 
-func (id Identifier) Col(c string) Expr {
+func (id Identifier) Col(c string) Expression {
 	return Expr{Col{table: id, column: Identifier(c)}}
 }
 
@@ -152,23 +152,23 @@ func (q *Dbq) Select(selectSpec ...interface{}) *SelectExpr {
 func Alias(expr interface{}, a string) AliasSpec {
 	switch expr := expr.(type) {
 	case string:
-		return AliasSpec{source: Identifier(expr), Expr: Expr{Identifier(a)}}
+		return AliasSpec{source: Identifier(expr), Expression: Expr{Identifier(a)}}
 	case Node:
-		return AliasSpec{source: Subexpr{Expr{expr}}, Expr: Expr{Identifier(a)}}
+		return AliasSpec{source: Subexpr{Expr{expr}}, Expression: Expr{Identifier(a)}}
 	default:
 		panic(fmt.Sprintf("%v of type %v does not implement Node", expr, reflect.TypeOf(expr)))
 	}
 }
 
 func (a AliasSpec) String() string {
-	return a.source.String() + " AS " + a.Expr.String()
+	return a.source.String() + " AS " + a.Expression.String()
 }
 
 func (a AliasSpec) Name() string {
-	return a.Expr.String()
+	return a.Expression.String()
 }
 
-func (a AliasSpec) Col(c string) Expr {
+func (a AliasSpec) Col(c string) Expression {
 	return Expr{Col{table: a, column: Identifier(c)}}
 }
 

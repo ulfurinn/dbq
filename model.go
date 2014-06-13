@@ -15,6 +15,6 @@ func (t Table) Name() string {
 	return t.DBName
 }
 
-func (t Table) Col(c string) Expr {
+func (t Table) Col(c string) Expression {
 	return Expr{Col{table: t, column: Identifier(c)}}
 }
