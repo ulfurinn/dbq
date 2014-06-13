@@ -33,7 +33,7 @@ func (s *SelectExpr) parseTableSpec(spec interface{}) {
 	switch spec := spec.(type) {
 	case string:
 		parsed = true
-		ts = Identifier{id: spec}
+		ts = Identifier(spec)
 	case AliasSpec:
 		parsed = true
 		ts = spec

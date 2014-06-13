@@ -3,6 +3,8 @@ package dbq
 import (
 	"database/sql"
 	"fmt"
+	"reflect"
+	"strconv"
 
 	_ "github.com/lib/pq"
 )
@@ -28,6 +30,22 @@ func (e Expr) Eq(other Expr) Expr {
 	return Binary(e, "=", other)
 }
 
+func (e Expr) Plus(other Expr) Expr {
+	return Binary(e, "+", other)
+}
+
+func (e Expr) Minus(other Expr) Expr {
+	return Binary(e, "-", other)
+}
+
+func (e Expr) Mult(other Expr) Expr {
+	return Binary(e, "*", other)
+}
+
+func (e Expr) Div(other Expr) Expr {
+	return Binary(e, "/", other)
+}
+
 type Named interface {
 	Name() string
 }
@@ -38,17 +56,13 @@ type Tabular interface {
 }
 
 type AliasSpec struct {
-	expr  Node
-	alias string
+	Expr
+	source Node
 }
 
-type Identifier struct {
-	id string
-}
+type Identifier string
 
-type Subexpr struct {
-	expr Node
-}
+type Subexpr Expr
 
 type Col struct {
 	table  Tabular
@@ -60,20 +74,36 @@ type BinaryOp struct {
 	operator string
 }
 
+type LiteralInt64 struct {
+	v int64
+}
+
+func (l LiteralInt64) String() string {
+	return strconv.FormatInt(l.v, 10)
+}
+
+type LiteralString struct {
+	v string
+}
+
+func (l LiteralString) String() string {
+	return l.v
+}
+
 func (id Identifier) String() string {
-	return id.id
+	return string(id)
 }
 
 func (id Identifier) Name() string {
-	return id.id
+	return string(id)
 }
 
 func (id Identifier) Col(c string) Expr {
-	return Expr{Col{table: id, column: Identifier{c}}}
+	return Expr{Col{table: id, column: Identifier(c)}}
 }
 
 func (e Subexpr) String() string {
-	return "(" + e.expr.String() + ")"
+	return "(" + e.Node.String() + ")"
 }
 
 func New(db *sql.DB, d dialect) *Dbq {
@@ -91,24 +121,24 @@ func (q *Dbq) Select(selectSpec ...interface{}) *SelectExpr {
 func Alias(expr interface{}, a string) AliasSpec {
 	switch expr := expr.(type) {
 	case string:
-		return AliasSpec{expr: Identifier{id: expr}, alias: a}
+		return AliasSpec{source: Identifier(expr), Expr: Expr{Identifier(a)}}
 	case Node:
-		return AliasSpec{expr: Subexpr{expr}, alias: a}
+		return AliasSpec{source: Subexpr{expr}, Expr: Expr{Identifier(a)}}
 	default:
 		panic(fmt.Sprintf("%v does not implement Node", expr))
 	}
 }
 
 func (a AliasSpec) String() string {
-	return a.expr.String() + " AS " + a.alias
+	return a.source.String() + " AS " + a.Expr.String()
 }
 
 func (a AliasSpec) Name() string {
-	return a.alias
+	return a.Expr.String()
 }
 
 func (a AliasSpec) Col(c string) Expr {
-	return Expr{Col{table: a, column: Identifier{c}}}
+	return Expr{Col{table: a, column: Identifier(c)}}
 }
 
 func (c Col) String() string {
@@ -124,5 +154,14 @@ func (op BinaryOp) String() string {
 }
 
 func Literal(v interface{}) Expr {
-	return Expr{} // TODO
+	switch v := v.(type) {
+	case int:
+		return Expr{LiteralInt64{int64(v)}}
+	case int64:
+		return Expr{LiteralInt64{v}}
+	case string:
+		return Expr{LiteralString{v}}
+	default:
+		panic(fmt.Sprintf("Unsupported literal %v of type %v", v, reflect.TypeOf(v)))
+	}
 }

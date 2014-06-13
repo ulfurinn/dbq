@@ -68,18 +68,28 @@ var _ = Describe("dbq", func() {
 
 	})
 
+	Describe("Alias", func() {
+		It("should be an expression", func() {
+			alias := Alias(Literal(2).Mult(Literal(2)), "x")
+			eq := alias.Eq(Literal(4))
+			Expect(alias.String()).To(Equal("(2 * 2) AS x"))
+			Expect(eq.String()).To(Equal("x = 4"))
+		})
+	})
+
 	Describe("Col()", func() {
 		It("should be usable on identifiers", func() {
-			t := Identifier{"t"}
+			t := Identifier("t")
 			Expect(t.Col("a").String()).To(Equal("t.a"))
 		})
 		It("should be usable on aliases", func() {
 			t := Alias("table", "t")
 			Expect(t.Col("a").String()).To(Equal("t.a"))
 		})
-		It("should be usable in operations", func() {
-			t := Identifier{"t"}
-			Expect(t.Col("a").Eq(t.Col("b")).String()).To(Equal("t.a = t.b"))
+		It("should support operators", func() {
+			t := Identifier("t")
+			expr := t.Col("a").Eq(t.Col("b"))
+			Expect(expr.String()).To(Equal("t.a = t.b"))
 		})
 	})
 

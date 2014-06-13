@@ -8,7 +8,7 @@ type Table struct {
 }
 
 func (t Table) Alias(a string) AliasSpec {
-	return Alias(Identifier{t.Name()}, a)
+	return Alias(Identifier(t.Name()), a)
 }
 
 func (t Table) Name() string {
@@ -16,5 +16,5 @@ func (t Table) Name() string {
 }
 
 func (t Table) Col(c string) Expr {
-	return Expr{Col{table: t, column: Identifier{c}}}
+	return Expr{Col{table: t, column: Identifier(c)}}
 }
