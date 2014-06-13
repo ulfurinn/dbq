@@ -12,8 +12,20 @@ type Dbq struct {
 	db *sql.DB
 }
 
-type Expr interface {
+type Node interface {
 	String() string
+}
+
+type Expr struct {
+	Node
+}
+
+func (e Expr) String() string {
+	return e.Node.String()
+}
+
+func (e Expr) Eq(other Expr) Expr {
+	return Binary(e, "=", other)
 }
 
 type Named interface {
@@ -26,7 +38,7 @@ type Tabular interface {
 }
 
 type AliasSpec struct {
-	expr  Expr
+	expr  Node
 	alias string
 }
 
@@ -35,12 +47,17 @@ type Identifier struct {
 }
 
 type Subexpr struct {
-	expr Expr
+	expr Node
 }
 
 type Col struct {
 	table  Tabular
 	column Identifier
+}
+
+type BinaryOp struct {
+	a, b     Expr
+	operator string
 }
 
 func (id Identifier) String() string {
@@ -52,7 +69,7 @@ func (id Identifier) Name() string {
 }
 
 func (id Identifier) Col(c string) Expr {
-	return Col{table: id, column: Identifier{c}}
+	return Expr{Col{table: id, column: Identifier{c}}}
 }
 
 func (e Subexpr) String() string {
@@ -75,10 +92,10 @@ func Alias(expr interface{}, a string) AliasSpec {
 	switch expr := expr.(type) {
 	case string:
 		return AliasSpec{expr: Identifier{id: expr}, alias: a}
-	case Expr:
+	case Node:
 		return AliasSpec{expr: Subexpr{expr}, alias: a}
 	default:
-		panic(fmt.Sprintf("%v does not implement Expr", expr))
+		panic(fmt.Sprintf("%v does not implement Node", expr))
 	}
 }
 
@@ -91,9 +108,21 @@ func (a AliasSpec) Name() string {
 }
 
 func (a AliasSpec) Col(c string) Expr {
-	return Col{table: a, column: Identifier{c}}
+	return Expr{Col{table: a, column: Identifier{c}}}
 }
 
 func (c Col) String() string {
 	return c.table.Name() + "." + c.column.Name()
+}
+
+func Binary(a Expr, op string, b Expr) Expr {
+	return Expr{BinaryOp{a: a, operator: op, b: b}}
+}
+
+func (op BinaryOp) String() string {
+	return op.a.String() + " " + op.operator + " " + op.b.String()
+}
+
+func Literal(v interface{}) Expr {
+	return Expr{} // TODO
 }

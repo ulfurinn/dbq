@@ -3,13 +3,13 @@ package dbq
 type selectColumnSpec struct{}
 
 type tableExprSpec interface {
-	Expr
+	Node
 }
 
 type SelectExpr struct {
 	q       *Dbq
 	columns []selectColumnSpec
-	tables  []Expr
+	tables  []Node
 }
 
 func (s *SelectExpr) parseSelectSpec(spec ...interface{}) *SelectExpr {
@@ -28,7 +28,7 @@ func (s *SelectExpr) From(tableSpecs ...interface{}) *SelectExpr {
 }
 
 func (s *SelectExpr) parseTableSpec(spec interface{}) {
-	var ts Expr
+	var ts Node
 	var parsed bool
 	switch spec := spec.(type) {
 	case string:

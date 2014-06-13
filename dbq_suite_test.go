@@ -77,6 +77,12 @@ var _ = Describe("dbq", func() {
 			t := Alias("table", "t")
 			Expect(t.Col("a").String()).To(Equal("t.a"))
 		})
+		It("should be usable in operations", func() {
+			t := Identifier{"t"}
+			Expect(t.Col("a").Eq(t.Col("b")).String()).To(Equal("t.a = t.b"))
+		})
 	})
+
+	Describe("Binary()", func() {})
 
 })
