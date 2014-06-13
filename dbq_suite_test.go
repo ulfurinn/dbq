@@ -68,4 +68,15 @@ var _ = Describe("dbq", func() {
 
 	})
 
+	Describe("Col()", func() {
+		It("should be usable on identifiers", func() {
+			t := Identifier{"t"}
+			Expect(t.Col("a").String()).To(Equal("t.a"))
+		})
+		It("should be usable on aliases", func() {
+			t := Alias("table", "t")
+			Expect(t.Col("a").String()).To(Equal("t.a"))
+		})
+	})
+
 })

@@ -16,7 +16,12 @@ type Expr interface {
 	String() string
 }
 
+type Named interface {
+	Name() string
+}
+
 type Tabular interface {
+	Named
 	Col(c string) Expr
 }
 
@@ -33,8 +38,21 @@ type Subexpr struct {
 	expr Expr
 }
 
+type Col struct {
+	table  Tabular
+	column Identifier
+}
+
 func (id Identifier) String() string {
 	return id.id
+}
+
+func (id Identifier) Name() string {
+	return id.id
+}
+
+func (id Identifier) Col(c string) Expr {
+	return Col{table: id, column: Identifier{c}}
 }
 
 func (e Subexpr) String() string {
@@ -56,7 +74,7 @@ func (q *Dbq) Select(selectSpec ...interface{}) *SelectExpr {
 func Alias(expr interface{}, a string) AliasSpec {
 	switch expr := expr.(type) {
 	case string:
-		return AliasSpec{expr: Identifier{expr}, alias: a}
+		return AliasSpec{expr: Identifier{id: expr}, alias: a}
 	case Expr:
 		return AliasSpec{expr: Subexpr{expr}, alias: a}
 	default:
@@ -66,4 +84,16 @@ func Alias(expr interface{}, a string) AliasSpec {
 
 func (a AliasSpec) String() string {
 	return a.expr.String() + " AS " + a.alias
+}
+
+func (a AliasSpec) Name() string {
+	return a.alias
+}
+
+func (a AliasSpec) Col(c string) Expr {
+	return Col{table: a, column: Identifier{c}}
+}
+
+func (c Col) String() string {
+	return c.table.Name() + "." + c.column.Name()
 }
