@@ -1,15 +1,15 @@
 package dbq
 
-type selectColumnSpec struct{}
-
 type tableExprSpec interface {
 	Node
 }
 
 type SelectExpr struct {
-	q       *Dbq
-	columns []selectColumnSpec
-	tables  []Node
+	q          *Dbq
+	columns    []Node
+	tables     []Node
+	conditions []Expression
+	Compound
 }
 
 func (s *SelectExpr) parseSelectSpec(spec ...interface{}) *SelectExpr {
@@ -43,7 +43,10 @@ func (s *SelectExpr) parseTableSpec(spec interface{}) {
 	}
 }
 
-func (s *SelectExpr) Where(whereSpecs ...interface{}) *SelectExpr {
+func (s *SelectExpr) Where(whereSpecs ...Expression) *SelectExpr {
+	for _, spec := range whereSpecs {
+		s.conditions = append(s.conditions, spec)
+	}
 	return s
 }
 

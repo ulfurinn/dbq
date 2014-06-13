@@ -66,6 +66,13 @@ var _ = Describe("dbq", func() {
 			})
 		})
 
+		Describe("Where()", func() {
+			It("should add conditions", func() {
+				expr := q.Select().From("t").Where(Ident("x").Eq(Literal(42)))
+				Expect(expr.String()).To(Equal("SELECT * FROM t WHERE x = 42"))
+			})
+		})
+
 	})
 
 	Describe("Alias", func() {
@@ -93,6 +100,13 @@ var _ = Describe("dbq", func() {
 		})
 	})
 
-	Describe("Binary()", func() {})
+	Describe("Binary()", func() {
+		It("should nest", func() {
+			expr1 := Literal(2).Plus(Literal(3)).Mult(Literal(5))
+			expr2 := Literal(2).Plus(Literal(3).Mult(Literal(5)))
+			Expect(expr1.String()).To(Equal("(2 + 3) * 5"))
+			Expect(expr2.String()).To(Equal("2 + (3 * 5)"))
+		})
+	})
 
 })

@@ -19,6 +19,14 @@ func (PostgresDialect) SelectString(s *SelectExpr) string {
 		}
 		q += strings.Join(tables, ", ")
 	}
+	if len(s.conditions) > 0 {
+		q += " WHERE "
+		condition := s.conditions[0]
+		for _, c := range s.conditions[1:] {
+			condition = condition.And(c)
+		}
+		q += condition.String()
+	}
 	return q
 }
 
