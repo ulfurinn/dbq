@@ -22,10 +22,6 @@ type Expr struct {
 	Node
 }
 
-func (e Expr) String() string {
-	return e.Node.String()
-}
-
 func (e Expr) Eq(other Expr) Expr {
 	return Binary(e, "=", other)
 }
