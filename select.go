@@ -9,30 +9,40 @@ type tableExprSpec interface {
 	Node
 }
 
-type SelectExpr struct {
-	q          *Dbq
+type SelectNode struct {
 	columns    []Node
 	tables     []Node
 	conditions []Expression
+	Bindings   map[string]Binding
 	Compound
+}
+
+type SelectExpr struct {
+	Expr
+	q *Dbq
 }
 
 func (s *SelectExpr) parseSelectSpec(spec ...interface{}) *SelectExpr {
 	return s
 }
 
+func (s *SelectExpr) Node() *SelectNode {
+	return s.Expr.Node.(*SelectNode)
+}
+
 func (s *SelectExpr) isSelectStar() bool {
-	return len(s.columns) == 0
+	return len(s.Node().columns) == 0
 }
 
 func (s *SelectExpr) From(tableSpecs ...interface{}) *SelectExpr {
+	n := s.Node()
 	for _, spec := range tableSpecs {
-		s.parseTableSpec(spec)
+		n.parseTableSpec(spec)
 	}
 	return s
 }
 
-func (s *SelectExpr) parseTableSpec(spec interface{}) {
+func (s *SelectNode) parseTableSpec(spec interface{}) {
 	var ts Node
 	var parsed bool
 	switch spec := spec.(type) {
@@ -51,17 +61,18 @@ func (s *SelectExpr) parseTableSpec(spec interface{}) {
 type Args map[string]interface{}
 
 func (s *SelectExpr) Where(whereSpecs ...interface{}) *SelectExpr {
+	n := s.Node()
 	for _, spec := range whereSpecs {
 		switch spec := spec.(type) {
 		case Expression:
-			s.conditions = append(s.conditions, spec)
+			n.conditions = append(n.conditions, spec)
 		case map[string]interface{}:
 			for name, value := range spec {
-				s.conditions = append(s.conditions, Ident(name).Eq(value))
+				n.conditions = append(n.conditions, Ident(name).Eq(value))
 			}
 		case Args:
 			for name, value := range spec {
-				s.conditions = append(s.conditions, Ident(name).Eq(value))
+				n.conditions = append(n.conditions, Ident(name).Eq(value))
 			}
 		default:
 			panic(fmt.Errorf("Don't know how to use %v of type %v as a condition", spec, reflect.TypeOf(spec)))
@@ -71,8 +82,19 @@ func (s *SelectExpr) Where(whereSpecs ...interface{}) *SelectExpr {
 	return s
 }
 
-func (s *SelectExpr) String() string {
-	return s.q.d.SelectString(s)
+type Binding struct {
+	Name        string
+	StaticValue interface{}
+}
+
+func (s *SelectExpr) Bind(name string) Binding {
+	n := s.Node()
+	if existing, ok := n.Bindings[name]; ok {
+		return existing
+	}
+	b := Binding{Name: name}
+	n.Bindings[name] = b
+	return b
 }
 
 func (s *SelectExpr) SQL(values ...map[string]interface{}) (query string, outValues []interface{}, err error) {
@@ -80,13 +102,9 @@ func (s *SelectExpr) SQL(values ...map[string]interface{}) (query string, outVal
 	if len(values) > 0 {
 		v = values[0]
 	}
-	return s.q.d.SelectSQL(s, v)
+	return s.q.d.SQL(Expr{s}, v)
 }
 
 func (s *SelectExpr) Into(out interface{}, values ...map[string]interface{}) error {
-	_, _, err := s.SQL(values...)
-	if err != nil {
-		return err
-	}
 	return nil
 }

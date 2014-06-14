@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
-	"strconv"
 
 	_ "github.com/lib/pq"
 )
@@ -15,7 +14,7 @@ type Dbq struct {
 }
 
 type Node interface {
-	String() string
+	//String() string
 	IsPrimitive() bool
 }
 
@@ -125,22 +124,22 @@ type LiteralInt64 struct {
 	Primitive
 }
 
-func (l LiteralInt64) String() string {
-	return strconv.FormatInt(l.v, 10)
-}
+// func (l LiteralInt64) String() string {
+// 	return strconv.FormatInt(l.v, 10)
+// }
 
 type LiteralString struct {
 	v string
 	Primitive
 }
 
-func (l LiteralString) String() string {
-	return "'" + l.v + "'"
-}
+// func (l LiteralString) String() string {
+// 	return "'" + l.v + "'"
+// }
 
-func (id Identifier) String() string {
-	return string(id)
-}
+// func (id Identifier) String() string {
+// 	return string(id)
+// }
 
 func (id Identifier) Name() string {
 	return string(id)
@@ -154,9 +153,9 @@ func (Identifier) IsPrimitive() bool {
 	return true
 }
 
-func (e Subexpr) String() string {
-	return "(" + e.Expression.String() + ")"
-}
+// func (e Subexpr) String() string {
+// 	return "(" + e.Expression.String() + ")"
+// }
 
 func New(db *sql.DB, d dialect) *Dbq {
 	return &Dbq{
@@ -170,7 +169,7 @@ func Ident(s string) Expression {
 }
 
 func (q *Dbq) Select(selectSpec ...interface{}) *SelectExpr {
-	stmt := &SelectExpr{q: q}
+	stmt := &SelectExpr{q: q, Expr: Expr{Node: &SelectNode{}}}
 	return stmt.parseSelectSpec(selectSpec...)
 }
 
@@ -185,21 +184,21 @@ func Alias(expr interface{}, a string) AliasSpec {
 	}
 }
 
-func (a AliasSpec) String() string {
-	return a.source.String() + " AS " + a.Expression.String()
-}
+// func (a AliasSpec) String() string {
+// 	return a.source.String() + " AS " + a.Expression.String()
+// }
 
 func (a AliasSpec) Name() string {
-	return a.Expression.String()
+	return string(a.Expression.(Expr).Node.(Identifier))
 }
 
 func (a AliasSpec) Col(c string) Expression {
 	return Expr{Col{table: a, column: Identifier(c)}}
 }
 
-func (c Col) String() string {
-	return c.table.Name() + "." + c.column.Name()
-}
+// func (c Col) String() string {
+// 	return c.table.Name() + "." + c.column.Name()
+// }
 
 func ensureExpression(v interface{}) Expression {
 	switch v := v.(type) {
@@ -224,9 +223,9 @@ func Binary(a interface{}, op string, b interface{}) Expression {
 	return Expr{BinaryOp{a: aExpr, operator: op, b: bExpr}}
 }
 
-func (op BinaryOp) String() string {
-	return op.a.String() + " " + op.operator + " " + op.b.String()
-}
+// func (op BinaryOp) String() string {
+// 	return op.a.String() + " " + op.operator + " " + op.b.String()
+// }
 
 func Literal(v interface{}) Expr {
 	switch v := v.(type) {

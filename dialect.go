@@ -1,6 +1,6 @@
 package dbq
 
 type dialect interface {
-	SelectString(s *SelectExpr) string
-	SelectSQL(s *SelectExpr, values map[string]interface{}) (query string, outValues []interface{}, err error)
+	SQLString(s Expression) (string, error)
+	SQL(s Expression, values Args) (query string, outValues []interface{}, err error)
 }
