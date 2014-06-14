@@ -1,155 +1,88 @@
 package dbq
 
 import (
-	"fmt"
-	"reflect"
-	"strconv"
 	"strings"
+
+	"fmt"
 )
 
 type PostgresDialect struct{}
 
-type PostgresContext struct {
-	e                 Expression
-	dynamicValues     Args
-	placeholderValues []interface{}
-	placeholderMap    map[string]int
+func (PostgresDialect) SQL(e Expression, v Args) (sql string, values []interface{}, err error) {
+	c := &PostgresCtx{}
+	sql, err = e.String(c)
+	return
 }
-
-// func (PostgresDialect) SelectString(s *SelectExpr) string {
-// 	q := "SELECT "
-// 	if s.isSelectStar() {
-// 		q += "* "
-// 	}
-// 	if len(s.tables) > 0 {
-// 		q += "FROM "
-// 		tables := []string{}
-// 		for _, table := range s.tables {
-// 			tables = append(tables, table.String())
-// 		}
-// 		q += strings.Join(tables, ", ")
-// 	}
-// 	if len(s.conditions) > 0 {
-// 		q += " WHERE "
-// 		condition := s.conditions[0]
-// 		for _, c := range s.conditions[1:] {
-// 			condition = condition.And(c)
-// 		}
-// 		q += condition.String()
-// 	}
-// 	return q
-// }
-
-func (d PostgresDialect) SQL(s Expression, values Args) (query string, outValues []interface{}, err error) {
-	c := d.Context(s, values)
-	query, err = c.SQL()
-	outValues = c.Values()
+func (PostgresDialect) SQLString(e Expression) (sql string, err error) {
+	c := &PostgresCtx{}
+	sql, err = e.String(c)
 	return
 }
 
-func (d PostgresDialect) SQLString(s Expression) (string, error) {
-	return d.Context(s, Args{}).SQL()
+type PostgresCtx struct {
 }
 
-func (d PostgresDialect) Context(e Expression, dynamicValues Args) *PostgresContext {
-	return &PostgresContext{e: e, dynamicValues: dynamicValues, placeholderMap: make(map[string]int)}
-}
-
-func (c *PostgresContext) SQL() (string, error) {
-	return c.subSQL(c.e)
-}
-
-func (c *PostgresContext) Values() (values []interface{}) {
-	return c.placeholderValues
-}
-
-func (c *PostgresContext) subSQL(e Expression) (q string, err error) {
-	switch e := e.(type) {
-	case Expr:
-		switch n := e.Node.(type) {
-		case Expr:
-			return c.subSQL(n)
-		case Identifier:
-			return string(n), nil
-		case LiteralInt64:
-			return strconv.FormatInt(n.v, 10), nil
-		case LiteralString:
-			c.placeholderValues = append(c.placeholderValues, n.v)
-			return fmt.Sprintf("$%d", len(c.placeholderValues)), nil
-		case Col:
-			return fmt.Sprintf(`"%s"."%s"`, n.table.Name(), n.column.Name()), nil
-		case Subexpr:
-			sql, err := c.subSQL(n.Expression)
-			if err != nil {
-				return "", err
-			}
-			return "(" + sql + ")", nil
-		case BinaryOp:
-			a, err1 := c.subSQL(n.a)
-			if err1 != nil {
-				return "", fmt.Errorf("in binaryop: %v", err1)
-			}
-			b, err2 := c.subSQL(n.b)
-			if err2 != nil {
-				return "", fmt.Errorf("in binaryop: %v", err2)
-			}
-			return a + " " + n.operator + " " + b, nil
-		case AliasSpec:
-			return c.subSQL(n)
-		case *SelectExpr:
-			return c.selectSQL(n)
-		default:
-			panic(fmt.Errorf("PostgresDialect cannot handle node type %v", reflect.TypeOf(n)))
-		}
-	case Subexpr:
-		sql, err := c.subSQL(e.Expression)
-		if err != nil {
-			return "", err
-		}
-		return "(" + sql + ")", nil
-	case AliasSpec:
-		sourceSQL, err := c.subSQL(Expr{e.source})
-		if err != nil {
-			return "", err
-		}
-		return sourceSQL + " AS " + e.Name(), nil
-	case *SelectExpr:
-		return c.selectSQL(e)
-	default:
-		panic(fmt.Errorf("PostgresDialect cannot handle expression type %v", reflect.TypeOf(e)))
+func (c *PostgresCtx) BinaryOp(e *BinaryOp) (sql string, err error) {
+	a, err := e.a.String(c)
+	if err != nil {
+		return
 	}
+	b, err := e.b.String(c)
+	if err != nil {
+		return
+	}
+	if e.a.IsCompound() {
+		a = "(" + a + ")"
+	}
+	if e.b.IsCompound() {
+		b = "(" + b + ")"
+	}
+	sql = a + " " + e.op + " " + b
 	return
 }
 
-func (c *PostgresContext) selectSQL(s *SelectExpr) (string, error) {
-	n := s.Node()
-	q := "SELECT "
+func (c *PostgresCtx) Column(col *ColumnExpr) (sql string, err error) {
+	return fmt.Sprintf(`"%s"."%s"`, col.table.Name(), col.column), nil
+}
+
+func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
+	sql = "SELECT "
 	if s.isSelectStar() {
-		q += "* "
+		sql += "*"
 	}
-	if len(n.tables) > 0 {
-		q += "FROM "
+	if len(s.tables) > 0 {
 		tables := []string{}
-		for _, table := range n.tables {
-			sql, err := c.subSQL(Expr{table})
+		for _, table := range s.tables {
+			tableSQL, err := table.String(c)
 			if err != nil {
 				return "", err
 			}
-			tables = append(tables, sql)
+			tables = append(tables, tableSQL)
 		}
-		q += strings.Join(tables, ", ")
+		sql += " FROM " + strings.Join(tables, ", ")
 	}
-	if len(n.conditions) > 0 {
-		q += " WHERE "
-		condition := n.conditions[0]
-		for _, c := range n.conditions[1:] {
-			condition = condition.And(c)
+	if len(s.conditions) > 0 {
+		acc := s.conditions[0]
+		for _, condition := range s.conditions[1:] {
+			acc = acc.And(condition)
 		}
-		sql, err := c.subSQL(condition)
+		conditionSQL, err := acc.String(c)
 		if err != nil {
 			return "", err
 		}
-		q += sql
+		sql += " WHERE " + conditionSQL
 	}
-	return q, nil
+	return
+}
+
+func (c *PostgresCtx) Alias(alias *AliasExpr) (sql string, err error) {
+	source, err := alias.Source.String(c)
+	if err != nil {
+		return
+	}
+	if alias.Source.IsCompound() {
+		source = "(" + source + ")"
+	}
+	sql = source + " AS " + alias.Name()
+	return
 }

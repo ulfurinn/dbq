@@ -1,6 +1,13 @@
 package dbq
 
-type dialect interface {
-	SQLString(s Expression) (string, error)
-	SQL(s Expression, values Args) (query string, outValues []interface{}, err error)
+type Dialect interface {
+	SQL(e Expression, v Args) (sql string, values []interface{}, err error)
+	SQLString(e Expression) (sql string, err error)
+}
+
+type Ctx interface {
+	Select(*SelectExpr) (string, error)
+	Column(*ColumnExpr) (string, error)
+	BinaryOp(*BinaryOp) (string, error)
+	Alias(*AliasExpr) (string, error)
 }

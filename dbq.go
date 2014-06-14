@@ -4,238 +4,119 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	_ "github.com/lib/pq"
 )
 
 type Dbq struct {
-	d  dialect
-	db *sql.DB
+	Dialect
+	*sql.DB
 }
 
-type Node interface {
-	//String() string
-	IsPrimitive() bool
-}
+type Args map[string]interface{}
 
-type Primitive struct{}
-
-func (Primitive) IsPrimitive() bool { return true }
-
-type Compound struct{}
-
-func (Compound) IsPrimitive() bool { return false }
-
-type Expression interface {
-	Node
-	Eq(e interface{}) Expression
-	NotEq(e interface{}) Expression
-	Less(e interface{}) Expression
-	LessEq(e interface{}) Expression
-	Greater(e interface{}) Expression
-	GreaterEq(e interface{}) Expression
-	Plus(e interface{}) Expression
-	Minus(e interface{}) Expression
-	Mult(e interface{}) Expression
-	Div(e interface{}) Expression
-	And(e interface{}) Expression
-}
-
-type Expr struct {
-	Node
-}
-
-func (e Expr) Eq(other interface{}) Expression {
-	return Binary(e, "=", other)
-}
-
-func (e Expr) NotEq(other interface{}) Expression {
-	return Binary(e, "!=", other)
-}
-
-func (e Expr) Less(other interface{}) Expression {
-	return Binary(e, "<", other)
-}
-
-func (e Expr) LessEq(other interface{}) Expression {
-	return Binary(e, "<=", other)
-}
-
-func (e Expr) Greater(other interface{}) Expression {
-	return Binary(e, ">", other)
-}
-
-func (e Expr) GreaterEq(other interface{}) Expression {
-	return Binary(e, ">=", other)
-}
-
-func (e Expr) Plus(other interface{}) Expression {
-	return Binary(e, "+", other)
-}
-
-func (e Expr) Minus(other interface{}) Expression {
-	return Binary(e, "-", other)
-}
-
-func (e Expr) Mult(other interface{}) Expression {
-	return Binary(e, "*", other)
-}
-
-func (e Expr) Div(other interface{}) Expression {
-	return Binary(e, "/", other)
-}
-
-func (e Expr) And(other interface{}) Expression {
-	return Binary(e, "AND", other)
-}
-
-type Named interface {
-	Name() string
-}
-
-type Tabular interface {
-	Named
-	Col(c string) Expression
-}
-
-type AliasSpec struct {
-	Expression
-	source Node
+type AliasExpr struct {
+	Expression // alias
+	Source     Node
 }
 
 type Identifier string
 
-type Subexpr struct{ Expression }
+func (Identifier) IsCompound() bool              { return false }
+func (id Identifier) String(Ctx) (string, error) { return string(id), nil }
+func (id Identifier) Name() string               { return string(id) }
+func (id Identifier) Col(column string) Expression {
+	return &Expr{&ColumnExpr{table: id, column: column}}
+}
 
-type Col struct {
+type Tabular interface {
+	Name() string
+	Col(name string) Expression
+}
+
+type ColumnExpr struct {
 	table  Tabular
-	column Identifier
+	column string
 	Primitive
+}
+
+func (col *ColumnExpr) String(c Ctx) (string, error) {
+	return c.Column(col)
+}
+
+func NewQ(db *sql.DB, d Dialect) *Dbq {
+	return &Dbq{Dialect: d, DB: db}
+}
+
+func Alias(source interface{}, name string) *AliasExpr {
+	var tabular Node
+	switch source := source.(type) {
+	case string:
+		tabular = Identifier(source)
+	case Node:
+		tabular = source
+	default:
+		panic(fmt.Errorf("Cannot use %v [%v] as alias source", source, reflect.TypeOf(source)))
+	}
+	return &AliasExpr{Expression: &Expr{Identifier(name)}, Source: tabular}
+}
+
+func (alias *AliasExpr) Col(column string) Expression {
+	return &Expr{&ColumnExpr{table: alias, column: column}}
+}
+func (alias *AliasExpr) Name() string {
+	return alias.Expression.(*Expr).Node.(Identifier).Name()
+}
+func (alias *AliasExpr) String(c Ctx) (string, error) {
+	return c.Alias(alias)
+}
+
+func Ident(id string) Expression {
+	return &Expr{Identifier(id)}
+}
+
+type LiteralInt64 int64
+
+func (LiteralInt64) IsCompound() bool             { return false }
+func (i LiteralInt64) String(Ctx) (string, error) { return strconv.FormatInt(int64(i), 10), nil }
+
+func Literal(value interface{}) Expression {
+	switch value := value.(type) {
+	case int:
+		return &Expr{LiteralInt64(value)}
+	case int32:
+		return &Expr{LiteralInt64(value)}
+	case int64:
+		return &Expr{LiteralInt64(value)}
+	default:
+		panic(fmt.Errorf("Cannot create a literal from %v [%v]", value, reflect.TypeOf(value)))
+	}
 }
 
 type BinaryOp struct {
-	a, b     Expression
-	operator string
+	a, b Expression
+	op   string
 	Compound
 }
 
-type LiteralInt64 struct {
-	v int64
-	Primitive
+func (op *BinaryOp) String(c Ctx) (string, error) {
+	return c.BinaryOp(op)
 }
 
-// func (l LiteralInt64) String() string {
-// 	return strconv.FormatInt(l.v, 10)
-// }
-
-type LiteralString struct {
-	v string
-	Primitive
-}
-
-// func (l LiteralString) String() string {
-// 	return "'" + l.v + "'"
-// }
-
-// func (id Identifier) String() string {
-// 	return string(id)
-// }
-
-func (id Identifier) Name() string {
-	return string(id)
-}
-
-func (id Identifier) Col(c string) Expression {
-	return Expr{Col{table: id, column: Identifier(c)}}
-}
-
-func (Identifier) IsPrimitive() bool {
-	return true
-}
-
-// func (e Subexpr) String() string {
-// 	return "(" + e.Expression.String() + ")"
-// }
-
-func New(db *sql.DB, d dialect) *Dbq {
-	return &Dbq{
-		d:  d,
-		db: db,
-	}
-}
-
-func Ident(s string) Expression {
-	return Expr{Identifier(s)}
-}
-
-func (q *Dbq) Select(selectSpec ...interface{}) *SelectExpr {
-	stmt := &SelectExpr{q: q, Expr: Expr{Node: &SelectNode{}}}
-	return stmt.parseSelectSpec(selectSpec...)
-}
-
-func Alias(expr interface{}, a string) AliasSpec {
-	switch expr := expr.(type) {
-	case string:
-		return AliasSpec{source: Identifier(expr), Expression: Expr{Identifier(a)}}
-	case Node:
-		return AliasSpec{source: Subexpr{Expr{expr}}, Expression: Expr{Identifier(a)}}
-	default:
-		panic(fmt.Sprintf("%v of type %v does not implement Node", expr, reflect.TypeOf(expr)))
-	}
-}
-
-// func (a AliasSpec) String() string {
-// 	return a.source.String() + " AS " + a.Expression.String()
-// }
-
-func (a AliasSpec) Name() string {
-	return string(a.Expression.(Expr).Node.(Identifier))
-}
-
-func (a AliasSpec) Col(c string) Expression {
-	return Expr{Col{table: a, column: Identifier(c)}}
-}
-
-// func (c Col) String() string {
-// 	return c.table.Name() + "." + c.column.Name()
-// }
-
-func ensureExpression(v interface{}) Expression {
+func operandToExpression(v interface{}) Expression {
 	switch v := v.(type) {
 	case Expression:
 		return v
-	case Expr:
-		return v
-	default:
+	case int, int32, int64:
 		return Literal(v)
+	default:
+		panic(fmt.Errorf("Cannot create an expression from %v [%v]", v, reflect.TypeOf(v)))
 	}
 }
 
 func Binary(a interface{}, op string, b interface{}) Expression {
-	aExpr := ensureExpression(a)
-	bExpr := ensureExpression(b)
-	if !aExpr.IsPrimitive() {
-		aExpr = Subexpr{aExpr}
-	}
-	if !bExpr.IsPrimitive() {
-		bExpr = Subexpr{bExpr}
-	}
-	return Expr{BinaryOp{a: aExpr, operator: op, b: bExpr}}
-}
-
-// func (op BinaryOp) String() string {
-// 	return op.a.String() + " " + op.operator + " " + op.b.String()
-// }
-
-func Literal(v interface{}) Expr {
-	switch v := v.(type) {
-	case int:
-		return Expr{LiteralInt64{v: int64(v)}}
-	case int64:
-		return Expr{LiteralInt64{v: v}}
-	case string:
-		return Expr{LiteralString{v: v}}
-	default:
-		panic(fmt.Sprintf("Unsupported literal %v of type %v", v, reflect.TypeOf(v)))
-	}
+	aEx := operandToExpression(a)
+	bEx := operandToExpression(b)
+	return &Expr{&BinaryOp{a: aEx, op: op, b: bEx}}
 }

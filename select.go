@@ -5,106 +5,59 @@ import (
 	"reflect"
 )
 
-type tableExprSpec interface {
-	Node
-}
-
-type SelectNode struct {
-	columns    []Node
-	tables     []Node
-	conditions []Expression
-	Bindings   map[string]Binding
-	Compound
-}
-
-type SelectExpr struct {
+type SelectQuery struct {
 	Expr
 	q *Dbq
 }
 
-func (s *SelectExpr) parseSelectSpec(spec ...interface{}) *SelectExpr {
-	return s
+type SelectExpr struct {
+	tables     []Node
+	conditions []Expression
+	Compound
 }
 
-func (s *SelectExpr) Node() *SelectNode {
-	return s.Expr.Node.(*SelectNode)
+func (q *Dbq) Select(spec ...interface{}) *SelectQuery {
+	return &SelectQuery{Expr: Expr{Node: &SelectExpr{}}, q: q}
 }
 
-func (s *SelectExpr) isSelectStar() bool {
-	return len(s.Node().columns) == 0
+func (s *SelectExpr) String(c Ctx) (string, error) {
+	return c.Select(s)
 }
 
-func (s *SelectExpr) From(tableSpecs ...interface{}) *SelectExpr {
-	n := s.Node()
-	for _, spec := range tableSpecs {
-		n.parseTableSpec(spec)
-	}
-	return s
+func (s *SelectQuery) expr() *SelectExpr {
+	return s.Expr.Node.(*SelectExpr)
 }
 
-func (s *SelectNode) parseTableSpec(spec interface{}) {
-	var ts Node
-	var parsed bool
-	switch spec := spec.(type) {
-	case string:
-		parsed = true
-		ts = Identifier(spec)
-	case AliasSpec:
-		parsed = true
-		ts = spec
-	}
-	if parsed {
-		s.tables = append(s.tables, ts)
-	}
-}
+func (s *SelectExpr) isSelectStar() bool { return true }
 
-type Args map[string]interface{}
-
-func (s *SelectExpr) Where(whereSpecs ...interface{}) *SelectExpr {
-	n := s.Node()
-	for _, spec := range whereSpecs {
+func (s *SelectQuery) From(specs ...interface{}) *SelectQuery {
+	ex := s.expr()
+	for _, spec := range specs {
 		switch spec := spec.(type) {
-		case Expression:
-			n.conditions = append(n.conditions, spec)
-		case map[string]interface{}:
-			for name, value := range spec {
-				n.conditions = append(n.conditions, Ident(name).Eq(value))
-			}
-		case Args:
-			for name, value := range spec {
-				n.conditions = append(n.conditions, Ident(name).Eq(value))
-			}
+		case string:
+			ex.tables = append(ex.tables, Ident(spec))
+		case *AliasExpr:
+			ex.tables = append(ex.tables, spec)
 		default:
-			panic(fmt.Errorf("Don't know how to use %v of type %v as a condition", spec, reflect.TypeOf(spec)))
+			panic(fmt.Errorf("Cannot use %v [%v] as a table spec", spec, reflect.TypeOf(spec)))
 		}
-
 	}
 	return s
 }
 
-type Binding struct {
-	Name        string
-	StaticValue interface{}
-}
-
-func (s *SelectExpr) Bind(name string) Binding {
-	n := s.Node()
-	if existing, ok := n.Bindings[name]; ok {
-		return existing
+func (s *SelectQuery) Where(specs ...interface{}) *SelectQuery {
+	ex := s.expr()
+	for _, spec := range specs {
+		switch spec := spec.(type) {
+		case Args:
+			for ident, value := range spec {
+				ex.conditions = append(ex.conditions, Ident(ident).Eq(value))
+			}
+		case Expression:
+			ex.conditions = append(ex.conditions, spec)
+		default:
+			panic(fmt.Errorf("Cannot use %v [%v] as a condition", spec, reflect.TypeOf(spec)))
+		}
 	}
-	b := Binding{Name: name}
-	n.Bindings[name] = b
-	return b
-}
-
-func (s *SelectExpr) SQL(values ...map[string]interface{}) (query string, outValues []interface{}, err error) {
-	var v map[string]interface{}
-	if len(values) > 0 {
-		v = values[0]
-	}
-	return s.q.d.SQL(Expr{s}, v)
-}
-
-func (s *SelectExpr) Into(out interface{}, values ...map[string]interface{}) error {
-	return nil
+	return s
 }
