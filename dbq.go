@@ -29,39 +29,39 @@ func (Compound) IsPrimitive() bool { return false }
 
 type Expression interface {
 	Node
-	Eq(e Expression) Expression
-	Plus(e Expression) Expression
-	Minus(e Expression) Expression
-	Mult(e Expression) Expression
-	Div(e Expression) Expression
-	And(e Expression) Expression
+	Eq(e interface{}) Expression
+	Plus(e interface{}) Expression
+	Minus(e interface{}) Expression
+	Mult(e interface{}) Expression
+	Div(e interface{}) Expression
+	And(e interface{}) Expression
 }
 
 type Expr struct {
 	Node
 }
 
-func (e Expr) Eq(other Expression) Expression {
+func (e Expr) Eq(other interface{}) Expression {
 	return Binary(e, "=", other)
 }
 
-func (e Expr) Plus(other Expression) Expression {
+func (e Expr) Plus(other interface{}) Expression {
 	return Binary(e, "+", other)
 }
 
-func (e Expr) Minus(other Expression) Expression {
+func (e Expr) Minus(other interface{}) Expression {
 	return Binary(e, "-", other)
 }
 
-func (e Expr) Mult(other Expression) Expression {
+func (e Expr) Mult(other interface{}) Expression {
 	return Binary(e, "*", other)
 }
 
-func (e Expr) Div(other Expression) Expression {
+func (e Expr) Div(other interface{}) Expression {
 	return Binary(e, "/", other)
 }
 
-func (e Expr) And(other Expression) Expression {
+func (e Expr) And(other interface{}) Expression {
 	return Binary(e, "AND", other)
 }
 

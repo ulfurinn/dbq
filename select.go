@@ -1,5 +1,10 @@
 package dbq
 
+import (
+	"fmt"
+	"reflect"
+)
+
 type tableExprSpec interface {
 	Node
 }
@@ -43,9 +48,25 @@ func (s *SelectExpr) parseTableSpec(spec interface{}) {
 	}
 }
 
-func (s *SelectExpr) Where(whereSpecs ...Expression) *SelectExpr {
+type Args map[string]interface{}
+
+func (s *SelectExpr) Where(whereSpecs ...interface{}) *SelectExpr {
 	for _, spec := range whereSpecs {
-		s.conditions = append(s.conditions, spec)
+		switch spec := spec.(type) {
+		case Expression:
+			s.conditions = append(s.conditions, spec)
+		case map[string]interface{}:
+			for name, value := range spec {
+				s.conditions = append(s.conditions, Ident(name).Eq(value))
+			}
+		case Args:
+			for name, value := range spec {
+				s.conditions = append(s.conditions, Ident(name).Eq(value))
+			}
+		default:
+			panic(fmt.Errorf("Don't know how to use %v of type %v as a condition", spec, reflect.TypeOf(spec)))
+		}
+
 	}
 	return s
 }

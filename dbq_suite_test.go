@@ -75,6 +75,10 @@ var _ = Describe("dbq", func() {
 				expr := q.Select().From("t").Where(Ident("x").Eq(Literal(42))).Where(Ident("y").Eq(Ident("z")))
 				Expect(expr.String()).To(Equal("SELECT * FROM t WHERE (x = 42) AND (y = z)"))
 			})
+			It("should take a map", func() {
+				expr := q.Select().From("t").Where(Args{"x": 42})
+				Expect(expr.String()).To(Equal("SELECT * FROM t WHERE x = 42"))
+			})
 		})
 
 	})
