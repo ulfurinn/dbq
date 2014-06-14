@@ -71,6 +71,10 @@ var _ = Describe("dbq", func() {
 				expr := q.Select().From("t").Where(Ident("x").Eq(Literal(42)))
 				Expect(expr.String()).To(Equal("SELECT * FROM t WHERE x = 42"))
 			})
+			It("should chain conditions", func() {
+				expr := q.Select().From("t").Where(Ident("x").Eq(Literal(42))).Where(Ident("y").Eq(Ident("z")))
+				Expect(expr.String()).To(Equal("SELECT * FROM t WHERE (x = 42) AND (y = z)"))
+			})
 		})
 
 	})
@@ -106,6 +110,10 @@ var _ = Describe("dbq", func() {
 			expr2 := Literal(2).Plus(Literal(3).Mult(Literal(5)))
 			Expect(expr1.String()).To(Equal("(2 + 3) * 5"))
 			Expect(expr2.String()).To(Equal("2 + (3 * 5)"))
+		})
+		It("should cast into expressions", func() {
+			expr := Binary(42, "=", "42")
+			Expect(expr.String()).To(Equal("42 = '42'"))
 		})
 	})
 

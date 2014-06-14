@@ -81,7 +81,7 @@ type AliasSpec struct {
 
 type Identifier string
 
-type Subexpr struct{ Expr }
+type Subexpr struct{ Expression }
 
 type Col struct {
 	table  Tabular
@@ -110,7 +110,7 @@ type LiteralString struct {
 }
 
 func (l LiteralString) String() string {
-	return l.v
+	return "'" + l.v + "'"
 }
 
 func (id Identifier) String() string {
@@ -130,7 +130,7 @@ func (Identifier) IsPrimitive() bool {
 }
 
 func (e Subexpr) String() string {
-	return "(" + e.Node.String() + ")"
+	return "(" + e.Expression.String() + ")"
 }
 
 func New(db *sql.DB, d dialect) *Dbq {
@@ -176,14 +176,27 @@ func (c Col) String() string {
 	return c.table.Name() + "." + c.column.Name()
 }
 
-func Binary(a Expression, op string, b Expression) Expression {
-	if !a.IsPrimitive() {
-		a = Subexpr{Expr{a}}
+func ensureExpression(v interface{}) Expression {
+	switch v := v.(type) {
+	case Expression:
+		return v
+	case Expr:
+		return v
+	default:
+		return Literal(v)
 	}
-	if !b.IsPrimitive() {
-		b = Subexpr{Expr{b}}
+}
+
+func Binary(a interface{}, op string, b interface{}) Expression {
+	aExpr := ensureExpression(a)
+	bExpr := ensureExpression(b)
+	if !aExpr.IsPrimitive() {
+		aExpr = Subexpr{aExpr}
 	}
-	return Expr{BinaryOp{a: a, operator: op, b: b}}
+	if !bExpr.IsPrimitive() {
+		bExpr = Subexpr{bExpr}
+	}
+	return Expr{BinaryOp{a: aExpr, operator: op, b: bExpr}}
 }
 
 func (op BinaryOp) String() string {
