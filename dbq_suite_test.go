@@ -109,13 +109,21 @@ var _ = Describe("dbq", func() {
 	})
 
 	Describe("Binary()", func() {
+		It("should use =", func() { Expect(Literal(1).Eq(1).String()).To(Equal("1 = 1")) })
+		It("should use !=", func() { Expect(Literal(1).NotEq(1).String()).To(Equal("1 != 1")) })
+		It("should use <", func() { Expect(Literal(1).Less(1).String()).To(Equal("1 < 1")) })
+		It("should use <=", func() { Expect(Literal(1).LessEq(1).String()).To(Equal("1 <= 1")) })
+		It("should use >", func() { Expect(Literal(1).Greater(1).String()).To(Equal("1 > 1")) })
+		It("should use >=", func() { Expect(Literal(1).GreaterEq(1).String()).To(Equal("1 >= 1")) })
+
 		It("should nest", func() {
 			expr1 := Literal(2).Plus(Literal(3)).Mult(Literal(5))
 			expr2 := Literal(2).Plus(Literal(3).Mult(Literal(5)))
 			Expect(expr1.String()).To(Equal("(2 + 3) * 5"))
 			Expect(expr2.String()).To(Equal("2 + (3 * 5)"))
 		})
-		It("should cast into expressions", func() {
+
+		It("should turn go values into expressions", func() {
 			expr := Binary(42, "=", "42")
 			Expect(expr.String()).To(Equal("42 = '42'"))
 		})

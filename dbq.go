@@ -30,6 +30,11 @@ func (Compound) IsPrimitive() bool { return false }
 type Expression interface {
 	Node
 	Eq(e interface{}) Expression
+	NotEq(e interface{}) Expression
+	Less(e interface{}) Expression
+	LessEq(e interface{}) Expression
+	Greater(e interface{}) Expression
+	GreaterEq(e interface{}) Expression
 	Plus(e interface{}) Expression
 	Minus(e interface{}) Expression
 	Mult(e interface{}) Expression
@@ -43,6 +48,26 @@ type Expr struct {
 
 func (e Expr) Eq(other interface{}) Expression {
 	return Binary(e, "=", other)
+}
+
+func (e Expr) NotEq(other interface{}) Expression {
+	return Binary(e, "!=", other)
+}
+
+func (e Expr) Less(other interface{}) Expression {
+	return Binary(e, "<", other)
+}
+
+func (e Expr) LessEq(other interface{}) Expression {
+	return Binary(e, "<=", other)
+}
+
+func (e Expr) Greater(other interface{}) Expression {
+	return Binary(e, ">", other)
+}
+
+func (e Expr) GreaterEq(other interface{}) Expression {
+	return Binary(e, ">=", other)
 }
 
 func (e Expr) Plus(other interface{}) Expression {
