@@ -127,3 +127,16 @@ func Binary(a interface{}, op string, b interface{}) Expression {
 	bEx := operandToExpression(b)
 	return &Expr{&BinaryOp{a: aEx, op: op, b: bEx}}
 }
+
+type Binding struct {
+	name string
+	Primitive
+}
+
+func (b *Binding) String(c Ctx) (string, error) {
+	return c.DynamicPlaceholder(b)
+}
+
+func Bind(name string) Expression {
+	return &Expr{&Binding{name: name}}
+}

@@ -8,20 +8,33 @@ import (
 
 type PostgresDialect struct{}
 
-func (PostgresDialect) SQL(e Expression, v Args) (sql string, values []interface{}, err error) {
-	c := &PostgresCtx{}
+func (d PostgresDialect) SQL(e Expression, v Args) (sql string, values []interface{}, err error) {
+	c := d.Ctx()
 	sql, err = e.String(c)
-	values = c.placeholderValues
+	for _, v := range c.placeholderValues {
+		values = append(values, v)
+	}
+	for k, v := range v {
+		index, ok := c.placeholderNameToIndex[k]
+		if ok {
+			values[index-1] = v
+		}
+	}
 	return
 }
-func (PostgresDialect) SQLString(e Expression) (sql string, err error) {
-	c := &PostgresCtx{}
+func (d PostgresDialect) SQLString(e Expression) (sql string, err error) {
+	c := d.Ctx()
 	sql, err = e.String(c)
 	return
 }
 
+func (PostgresDialect) Ctx() *PostgresCtx {
+	return &PostgresCtx{placeholderNameToIndex: make(map[string]int)}
+}
+
 type PostgresCtx struct {
-	placeholderValues []interface{}
+	placeholderValues      []interface{}
+	placeholderNameToIndex map[string]int
 }
 
 func (c *PostgresCtx) BinaryOp(e *BinaryOp) (sql string, err error) {
@@ -91,6 +104,18 @@ func (c *PostgresCtx) Alias(alias *AliasExpr) (sql string, err error) {
 
 func (c *PostgresCtx) StaticPlaceholder(value interface{}) (sql string, err error) {
 	c.placeholderValues = append(c.placeholderValues, value)
+	sql = fmt.Sprintf("$%d", len(c.placeholderValues))
+	return
+}
+
+func (c *PostgresCtx) DynamicPlaceholder(b *Binding) (sql string, err error) {
+	existing, ok := c.placeholderNameToIndex[b.name]
+	if ok {
+		sql = fmt.Sprintf("$%d", existing)
+		return
+	}
+	c.placeholderValues = append(c.placeholderValues, nil)
+	c.placeholderNameToIndex[b.name] = len(c.placeholderValues)
 	sql = fmt.Sprintf("$%d", len(c.placeholderValues))
 	return
 }
