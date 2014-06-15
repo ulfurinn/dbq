@@ -67,6 +67,16 @@ func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
 	}
 	if s.isSelectStar() {
 		sql += "*"
+	} else {
+		columns := []string{}
+		for _, col := range s.columns {
+			sql, err := col.String(c)
+			if err != nil {
+				return "", err
+			}
+			columns = append(columns, sql)
+		}
+		sql += strings.Join(columns, ", ")
 	}
 	if len(s.tables) > 0 {
 		tables := []string{}
