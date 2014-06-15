@@ -136,7 +136,7 @@ var _ = Describe("dbq", func() {
 			Expect(Q(expr2)).To(Equal("2 + (3 * 5)"))
 		})
 
-		XIt("should turn go values into expressions", func() {
+		It("should turn go values into expressions", func() {
 			expr := Binary(42, "=", "42")
 			sql, v := QB(expr)
 			Expect(sql).To(Equal("42 = $1"))

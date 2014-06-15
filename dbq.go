@@ -81,6 +81,11 @@ type LiteralInt64 int64
 func (LiteralInt64) IsCompound() bool             { return false }
 func (i LiteralInt64) String(Ctx) (string, error) { return strconv.FormatInt(int64(i), 10), nil }
 
+type LiteralString string
+
+func (LiteralString) IsCompound() bool               { return false }
+func (s LiteralString) String(c Ctx) (string, error) { return c.StaticPlaceholder(string(s)) }
+
 func Literal(value interface{}) Expression {
 	switch value := value.(type) {
 	case int:
@@ -89,6 +94,8 @@ func Literal(value interface{}) Expression {
 		return &Expr{LiteralInt64(value)}
 	case int64:
 		return &Expr{LiteralInt64(value)}
+	case string:
+		return &Expr{LiteralString(value)}
 	default:
 		panic(fmt.Errorf("Cannot create a literal from %v [%v]", value, reflect.TypeOf(value)))
 	}
@@ -108,7 +115,7 @@ func operandToExpression(v interface{}) Expression {
 	switch v := v.(type) {
 	case Expression:
 		return v
-	case int, int32, int64:
+	case int, int32, int64, string:
 		return Literal(v)
 	default:
 		panic(fmt.Errorf("Cannot create an expression from %v [%v]", v, reflect.TypeOf(v)))

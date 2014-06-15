@@ -11,6 +11,7 @@ type PostgresDialect struct{}
 func (PostgresDialect) SQL(e Expression, v Args) (sql string, values []interface{}, err error) {
 	c := &PostgresCtx{}
 	sql, err = e.String(c)
+	values = c.placeholderValues
 	return
 }
 func (PostgresDialect) SQLString(e Expression) (sql string, err error) {
@@ -20,6 +21,7 @@ func (PostgresDialect) SQLString(e Expression) (sql string, err error) {
 }
 
 type PostgresCtx struct {
+	placeholderValues []interface{}
 }
 
 func (c *PostgresCtx) BinaryOp(e *BinaryOp) (sql string, err error) {
@@ -84,5 +86,11 @@ func (c *PostgresCtx) Alias(alias *AliasExpr) (sql string, err error) {
 		source = "(" + source + ")"
 	}
 	sql = source + " AS " + alias.Name()
+	return
+}
+
+func (c *PostgresCtx) StaticPlaceholder(value interface{}) (sql string, err error) {
+	c.placeholderValues = append(c.placeholderValues, value)
+	sql = fmt.Sprintf("$%d", len(c.placeholderValues))
 	return
 }

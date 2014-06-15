@@ -10,4 +10,5 @@ type Ctx interface {
 	Column(*ColumnExpr) (string, error)
 	BinaryOp(*BinaryOp) (string, error)
 	Alias(*AliasExpr) (string, error)
+	StaticPlaceholder(value interface{}) (string, error)
 }
