@@ -11,13 +11,28 @@ type SelectQuery struct {
 }
 
 type SelectExpr struct {
+	distinct   bool
+	columns    []Node
 	tables     []Node
 	conditions []Expression
 	Compound
 }
 
+type Distinct struct{}
+
 func (q *Dbq) Select(spec ...interface{}) *SelectQuery {
-	return &SelectQuery{Expr: Expr{Node: &SelectExpr{}}, q: q}
+	node := &SelectExpr{}
+	node.parseSelect(spec)
+	return &SelectQuery{Expr: Expr{Node: node}, q: q}
+}
+
+func (s *SelectExpr) parseSelect(specs []interface{}) {
+	for _, spec := range specs {
+		switch spec.(type) {
+		case Distinct:
+			s.distinct = true
+		}
+	}
 }
 
 func (s *SelectExpr) String(c Ctx) (string, error) {
@@ -28,7 +43,7 @@ func (s *SelectQuery) expr() *SelectExpr {
 	return s.Expr.Node.(*SelectExpr)
 }
 
-func (s *SelectExpr) isSelectStar() bool { return true }
+func (s *SelectExpr) isSelectStar() bool { return len(s.columns) == 0 }
 
 func (s *SelectQuery) From(specs ...interface{}) *SelectQuery {
 	ex := s.expr()

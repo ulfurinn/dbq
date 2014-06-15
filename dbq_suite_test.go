@@ -63,6 +63,11 @@ var _ = Describe("dbq", func() {
 			})
 		})
 
+		It("should accept Distinct", func() {
+			e := q.Select(Distinct{}).From("t")
+			Expect(Q(e)).To(Equal("SELECT DISTINCT * FROM t"))
+		})
+
 		Describe("From()", func() {
 			It("should add a table to the FROM clause", func() {
 				s = q.Select().From("t")

@@ -62,6 +62,9 @@ func (c *PostgresCtx) Column(col *ColumnExpr) (sql string, err error) {
 
 func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
 	sql = "SELECT "
+	if s.distinct {
+		sql += "DISTINCT "
+	}
 	if s.isSelectStar() {
 		sql += "*"
 	}
