@@ -1,6 +1,7 @@
 package dbq
 
 import (
+	"reflect"
 	"strings"
 
 	"fmt"
@@ -80,14 +81,18 @@ func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
 	}
 	if len(s.tables) > 0 {
 		tables := []string{}
-		for _, table := range s.tables {
+		for i, table := range s.tables {
 			tableSQL, err := table.String(c)
 			if err != nil {
 				return "", err
 			}
+			_, isJoin := table.(*JoinExpr)
+			if i > 0 && !isJoin { //	two tables without an explicit join condition
+				tableSQL = ", " + tableSQL
+			}
 			tables = append(tables, tableSQL)
 		}
-		sql += " FROM " + strings.Join(tables, ", ")
+		sql += " FROM " + strings.Join(tables, " ")
 	}
 	if len(s.conditions) > 0 {
 		acc := s.conditions[0]
@@ -131,4 +136,45 @@ func (c *PostgresCtx) DynamicPlaceholder(b *Binding) (sql string, err error) {
 	c.placeholderNameToIndex[b.name] = len(c.placeholderValues)
 	sql = fmt.Sprintf("$%d", len(c.placeholderValues))
 	return
+}
+
+func (c *PostgresCtx) Join(j *JoinExpr) (sql string, err error) {
+	var join string
+	switch j.kind {
+	case InnerJoinKind:
+		join = "INNER JOIN"
+	case LeftJoinKind:
+		join = "LEFT JOIN"
+	case RightJoinKind:
+		join = "RIGHT JOIN"
+	case OuterJoinKind:
+		join = "OUTER JOIN"
+	}
+	tableSql, err := j.table.String(c)
+	if err != nil {
+		return "", err
+	}
+	conditionSql, err := j.condition.String(c)
+	if err != nil {
+		return "", err
+	}
+	return join + " " + tableSql + " " + conditionSql, nil
+}
+
+func (c *PostgresCtx) JoinCondition(jc *JoinCondition) (sql string, err error) {
+	switch jc.kind {
+	case JoinOn:
+		sql, err := jc.condition.String(c)
+		if err != nil {
+			return "", err
+		}
+		return "ON (" + sql + ")", nil
+	case JoinUsing:
+		sql, err := jc.condition.String(c)
+		if err != nil {
+			return "", err
+		}
+		return "USING (" + sql + ")", nil
+	}
+	return "", fmt.Errorf("Could not use %v [%v] as a join condition", jc, reflect.TypeOf(jc))
 }

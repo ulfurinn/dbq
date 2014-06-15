@@ -12,4 +12,6 @@ type Ctx interface {
 	Alias(*AliasExpr) (string, error)
 	StaticPlaceholder(interface{}) (string, error)
 	DynamicPlaceholder(*Binding) (string, error)
+	Join(*JoinExpr) (string, error)
+	JoinCondition(*JoinCondition) (string, error)
 }

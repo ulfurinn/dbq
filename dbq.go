@@ -25,14 +25,24 @@ type Identifier string
 
 func (Identifier) IsCompound() bool              { return false }
 func (id Identifier) String(Ctx) (string, error) { return string(id), nil }
-func (id Identifier) Name() string               { return string(id) }
-func (id Identifier) Col(column string) Expression {
+
+func (id *IdentExpr) Name() string { return string(id.Node.(Identifier)) }
+func (id *IdentExpr) Col(column string) Expression {
 	return &Expr{&ColumnExpr{table: id, column: column}}
+}
+
+type IdentExpr struct {
+	Expr
 }
 
 type Tabular interface {
 	Name() string
 	Col(name string) Expression
+}
+
+type TabularExpression interface {
+	Tabular
+	Expression
 }
 
 type ColumnExpr struct {
@@ -53,27 +63,27 @@ func Alias(source interface{}, name string) *AliasExpr {
 	var tabular Node
 	switch source := source.(type) {
 	case string:
-		tabular = Identifier(source)
+		tabular = Ident(source)
 	case Node:
 		tabular = source
 	default:
 		panic(fmt.Errorf("Cannot use %v [%v] as alias source", source, reflect.TypeOf(source)))
 	}
-	return &AliasExpr{Expression: &Expr{Identifier(name)}, Source: tabular}
+	return &AliasExpr{Expression: Ident(name), Source: tabular}
 }
 
 func (alias *AliasExpr) Col(column string) Expression {
 	return &Expr{&ColumnExpr{table: alias, column: column}}
 }
 func (alias *AliasExpr) Name() string {
-	return alias.Expression.(*Expr).Node.(Identifier).Name()
+	return alias.Expression.(*IdentExpr).Name()
 }
 func (alias *AliasExpr) String(c Ctx) (string, error) {
 	return c.Alias(alias)
 }
 
-func Ident(id string) Expression {
-	return &Expr{Identifier(id)}
+func Ident(id string) TabularExpression {
+	return &IdentExpr{Expr: Expr{Identifier(id)}}
 }
 
 type LiteralInt64 int64

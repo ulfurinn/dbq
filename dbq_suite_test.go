@@ -86,6 +86,24 @@ var _ = Describe("dbq", func() {
 				s = q.Select().From(Alias(s1, "s"))
 				Expect(Q(s)).To(Equal("SELECT * FROM (SELECT * FROM t) AS s"))
 			})
+			It("should join two tables with a comma", func() {
+				s = q.Select().From("t1", "t2")
+				Expect(Q(s)).To(Equal("SELECT * FROM t1 , t2"))
+			})
+			It("should use JOIN ON", func() {
+				s = q.Select().From("t1", Join("t2", On(Ident("c1").Eq(Ident("c2")))))
+				Expect(Q(s)).To(Equal("SELECT * FROM t1 INNER JOIN t2 ON (c1 = c2)"))
+			})
+			It("should use JOIN USING", func() {
+				s = q.Select().From("t1", Join("t2", Using(Ident("c1"))))
+				Expect(Q(s)).To(Equal("SELECT * FROM t1 INNER JOIN t2 USING (c1)"))
+			})
+			It("should join using column expressions", func() {
+				t1 := Ident("t1")
+				t2 := Ident("t2")
+				s = q.Select().From(t1, Join(t2, On(t1.Col("c1").Eq(t2.Col("c2")))))
+				Expect(Q(s)).To(Equal(`SELECT * FROM t1 INNER JOIN t2 ON ("t1"."c1" = "t2"."c2")`))
+			})
 		})
 
 		Describe("Where()", func() {
@@ -116,7 +134,7 @@ var _ = Describe("dbq", func() {
 
 	Describe("Col()", func() {
 		It("should be usable on identifiers", func() {
-			t := Identifier("t")
+			t := Ident("t")
 			Expect(Q(t.Col("a"))).To(Equal(`"t"."a"`))
 		})
 		It("should be usable on aliases", func() {
@@ -124,7 +142,7 @@ var _ = Describe("dbq", func() {
 			Expect(Q(t.Col("a"))).To(Equal(`"t"."a"`))
 		})
 		It("should support operators", func() {
-			t := Identifier("t")
+			t := Ident("t")
 			expr := t.Col("a").Eq(t.Col("b"))
 			Expect(Q(expr)).To(Equal(`"t"."a" = "t"."b"`))
 		})
