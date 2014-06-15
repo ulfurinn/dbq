@@ -166,6 +166,14 @@ var _ = Describe("dbq", func() {
 			Expect(v).To(HaveLen(1))
 			Expect(v[0]).To(Equal(42))
 		})
+		It("should play nicely with string literals", func() {
+			e := q.Select().From("t").Where(Ident("a").Eq("meh")).Where(Ident("x").Eq(Bind("myValue")))
+			sql, v, _ := q.SQL(e, Args{"myValue": 42})
+			Expect(sql).To(Equal("SELECT * FROM t WHERE (a = $1) AND (x = $2)"))
+			Expect(v).To(HaveLen(2))
+			Expect(v[0]).To(Equal("meh"))
+			Expect(v[1]).To(Equal(42))
+		})
 	})
 
 })
