@@ -68,8 +68,8 @@ var _ = Describe("dbq", func() {
 			Expect(Q(e)).To(Equal("SELECT DISTINCT * FROM t"))
 		})
 		It("should accept a column list", func() {
-			e := q.Select(Ident("a"), Alias("b", "b_alias"), Alias(Literal(2).Plus(2), "c")).From("t")
-			Expect(Q(e)).To(Equal("SELECT a, b AS b_alias, (2 + 2) AS c FROM t"))
+			e := q.Select(Ident("a"), "a1", Alias("b", "b_alias"), Alias(Literal(2).Plus(2), "c")).From("t")
+			Expect(Q(e)).To(Equal("SELECT a, a1, b AS b_alias, (2 + 2) AS c FROM t"))
 		})
 
 		Describe("From()", func() {

@@ -29,6 +29,8 @@ func (q *Dbq) Select(spec ...interface{}) *SelectQuery {
 func (s *SelectExpr) parseSelect(specs []interface{}) {
 	for _, spec := range specs {
 		switch spec := spec.(type) {
+		case string:
+			s.columns = append(s.columns, Ident(spec))
 		case Distinct:
 			s.distinct = true
 		case Node:
