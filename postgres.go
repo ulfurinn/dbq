@@ -11,14 +11,21 @@ type PostgresDialect struct{}
 
 func (d PostgresDialect) SQL(e Expression, v Args) (sql string, values []interface{}, err error) {
 	c := d.Ctx()
+	c.dynamicValues = v
 	sql, err = e.String(c)
 	for _, v := range c.placeholderValues {
 		values = append(values, v)
 	}
 	for k, v := range v {
-		index, ok := c.placeholderNameToIndex[k]
+		indexes, ok := c.placeholderNameToIndexes[k]
 		if ok {
-			values[index-1] = v
+			if genericList, ok := toInterfaceSlice(v); ok {
+				for i, index := range indexes {
+					values[index-1] = genericList[i]
+				}
+			} else {
+				values[indexes[0]-1] = v
+			}
 		}
 	}
 	return
@@ -30,12 +37,13 @@ func (d PostgresDialect) SQLString(e Expression) (sql string, err error) {
 }
 
 func (PostgresDialect) Ctx() *PostgresCtx {
-	return &PostgresCtx{placeholderNameToIndex: make(map[string]int)}
+	return &PostgresCtx{placeholderNameToIndexes: make(map[string][]int)}
 }
 
 type PostgresCtx struct {
-	placeholderValues      []interface{}
-	placeholderNameToIndex map[string]int
+	placeholderValues        []interface{}
+	placeholderNameToIndexes map[string][]int
+	dynamicValues            Args
 }
 
 func (c *PostgresCtx) BinaryOp(e *BinaryOp) (sql string, err error) {
@@ -121,19 +129,49 @@ func (c *PostgresCtx) Alias(alias *AliasExpr) (sql string, err error) {
 }
 
 func (c *PostgresCtx) StaticPlaceholder(value interface{}) (sql string, err error) {
+	list, ok := value.([]interface{})
+	if ok {
+		strs := []string{}
+		for _, e := range list {
+			sql, err = c.StaticPlaceholder(e)
+			if err != nil {
+				return
+			}
+			strs = append(strs, sql)
+		}
+		sql = strings.Join(strs, ",")
+		return
+	}
 	c.placeholderValues = append(c.placeholderValues, value)
 	sql = fmt.Sprintf("$%d", len(c.placeholderValues))
 	return
 }
 
 func (c *PostgresCtx) DynamicPlaceholder(b *Binding) (sql string, err error) {
-	existing, ok := c.placeholderNameToIndex[b.name]
+	existing, ok := c.placeholderNameToIndexes[b.name]
 	if ok {
-		sql = fmt.Sprintf("$%d", existing)
+		strs := []string{}
+		for _, i := range existing {
+			strs = append(strs, fmt.Sprintf("$%d", i))
+		}
+		sql = strings.Join(strs, ",")
+		return
+	}
+	v := reflect.ValueOf(c.dynamicValues[b.name])
+	if v.Kind() == reflect.Slice {
+		indexes := []int{}
+		strs := []string{}
+		for i := 0; i < v.Len(); i++ {
+			c.placeholderValues = append(c.placeholderValues, nil)
+			indexes = append(indexes, len(c.placeholderValues))
+			strs = append(strs, fmt.Sprintf("$%d", len(c.placeholderValues)))
+		}
+		c.placeholderNameToIndexes[b.name] = indexes
+		sql = strings.Join(strs, ",")
 		return
 	}
 	c.placeholderValues = append(c.placeholderValues, nil)
-	c.placeholderNameToIndex[b.name] = len(c.placeholderValues)
+	c.placeholderNameToIndexes[b.name] = []int{len(c.placeholderValues)}
 	sql = fmt.Sprintf("$%d", len(c.placeholderValues))
 	return
 }
@@ -177,4 +215,19 @@ func (c *PostgresCtx) JoinCondition(jc *JoinCondition) (sql string, err error) {
 		return "USING (" + sql + ")", nil
 	}
 	return "", fmt.Errorf("Could not use %v [%v] as a join condition", jc, reflect.TypeOf(jc))
+}
+
+func (c *PostgresCtx) In(in *InExpr) (sql string, err error) {
+	element, err := in.element.String(c)
+	if err != nil {
+		return "", err
+	}
+	list, err := in.list.String(c)
+	if err != nil {
+		return "", err
+	}
+	if in.list.IsCompound() {
+		list = "(" + list + ")"
+	}
+	return element + " IN " + list, nil
 }

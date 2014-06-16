@@ -14,4 +14,5 @@ type Ctx interface {
 	DynamicPlaceholder(*Binding) (string, error)
 	Join(*JoinExpr) (string, error)
 	JoinCondition(*JoinCondition) (string, error)
+	In(*InExpr) (string, error)
 }

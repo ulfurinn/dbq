@@ -96,6 +96,11 @@ type LiteralString string
 func (LiteralString) IsCompound() bool               { return false }
 func (s LiteralString) String(c Ctx) (string, error) { return c.StaticPlaceholder(string(s)) }
 
+type LiteralList []interface{}
+
+func (LiteralList) IsCompound() bool               { return true }
+func (l LiteralList) String(c Ctx) (string, error) { return c.StaticPlaceholder([]interface{}(l)) }
+
 func Literal(value interface{}) Expression {
 	switch value := value.(type) {
 	case int:
@@ -106,6 +111,8 @@ func Literal(value interface{}) Expression {
 		return &Expr{LiteralInt64(value)}
 	case string:
 		return &Expr{LiteralString(value)}
+	case []interface{}:
+		return &Expr{LiteralList(value)}
 	default:
 		panic(fmt.Errorf("Cannot create a literal from %v [%v]", value, reflect.TypeOf(value)))
 	}
@@ -132,15 +139,54 @@ func operandToExpression(v interface{}) Expression {
 	}
 }
 
+func toInterfaceSlice(v interface{}) (result []interface{}, ok bool) {
+	if reflect.TypeOf(v).Kind() != reflect.Slice {
+		return nil, false
+	}
+	ok = true
+	val := reflect.ValueOf(v)
+	for i := 0; i < val.Len(); i++ {
+		result = append(result, val.Index(i).Interface())
+	}
+	return
+}
+
+func listToExpression(v interface{}) Expression {
+	expr, isExpr := v.(Expression)
+	if isExpr {
+		return expr
+	}
+	if genericList, ok := toInterfaceSlice(v); ok {
+		return Literal(genericList)
+	}
+	return Literal([]interface{}{v})
+}
+
 func Binary(a interface{}, op string, b interface{}) Expression {
 	aEx := operandToExpression(a)
 	bEx := operandToExpression(b)
 	return &Expr{&BinaryOp{a: aEx, op: op, b: bEx}}
 }
 
-type Binding struct {
-	name string
+type InExpr struct {
+	element Expression
+	list    Expression
 	Primitive
+}
+
+func (in *InExpr) String(c Ctx) (string, error) {
+	return c.In(in)
+}
+
+func In(element interface{}, list interface{}) Expression {
+	elementEx := operandToExpression(element)
+	listEx := listToExpression(list)
+	return &Expr{&InExpr{element: elementEx, list: listEx}}
+}
+
+type Binding struct {
+	name     string
+	Compound // required to work with IN(). should be cleaned up, maybe.
 }
 
 func (b *Binding) String(c Ctx) (string, error) {

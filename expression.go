@@ -25,6 +25,8 @@ type Expression interface {
 	Greater(other interface{}) Expression
 	GreaterEq(other interface{}) Expression
 
+	In(other interface{}) Expression
+
 	And(other interface{}) Expression
 	Or(other interface{}) Expression
 }
@@ -67,4 +69,7 @@ func (e *Expr) And(other interface{}) Expression {
 }
 func (e *Expr) Or(other interface{}) Expression {
 	return Binary(e, "OR", other)
+}
+func (e *Expr) In(other interface{}) Expression {
+	return In(e, other)
 }
