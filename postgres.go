@@ -17,6 +17,9 @@ func (d PostgresDialect) SQL(e Expression, v Args) (sql string, values []interfa
 		values = append(values, v)
 	}
 	for k, v := range v {
+		if v == nil {
+			continue
+		}
 		indexes, ok := c.placeholderNameToIndexes[k]
 		if ok {
 			if genericList, ok := toInterfaceSlice(v); ok {
@@ -46,6 +49,11 @@ type PostgresCtx struct {
 	dynamicValues            Args
 }
 
+func (c PostgresCtx) BindValue(b *Binding) (value interface{}, ok bool) {
+	value, ok = c.dynamicValues[b.name]
+	return
+}
+
 func (c *PostgresCtx) BinaryOp(e *BinaryOp) (sql string, err error) {
 	a, err := e.a.String(c)
 	if err != nil {
@@ -61,7 +69,16 @@ func (c *PostgresCtx) BinaryOp(e *BinaryOp) (sql string, err error) {
 	if e.b.IsCompound() {
 		b = "(" + b + ")"
 	}
-	sql = a + " " + e.op + " " + b
+	nullable, ok := e.b.(Nullable)
+	if ok && nullable.IsNull(c) && (e.op == "=" || e.op == "!=") {
+		if e.op == "=" {
+			sql = a + " IS NULL"
+		} else {
+			sql = a + " IS NOT NULL"
+		}
+	} else {
+		sql = a + " " + e.op + " " + b
+	}
 	return
 }
 
@@ -157,7 +174,11 @@ func (c *PostgresCtx) DynamicPlaceholder(b *Binding) (sql string, err error) {
 		sql = strings.Join(strs, ",")
 		return
 	}
-	v := reflect.ValueOf(c.dynamicValues[b.name])
+	bound := c.dynamicValues[b.name] // TODO: check for unbound arg
+	if bound == nil {
+		return "", nil // this will be ignored and formatted as IS NULL instead
+	}
+	v := reflect.ValueOf(bound)
 	if v.Kind() == reflect.Slice {
 		indexes := []int{}
 		strs := []string{}

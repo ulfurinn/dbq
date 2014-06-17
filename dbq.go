@@ -45,6 +45,10 @@ type TabularExpression interface {
 	Expression
 }
 
+type Nullable interface {
+	IsNull(Ctx) bool
+}
+
 type ColumnExpr struct {
 	table  Tabular
 	column string
@@ -101,7 +105,16 @@ type LiteralList []interface{}
 func (LiteralList) IsCompound() bool               { return true }
 func (l LiteralList) String(c Ctx) (string, error) { return c.StaticPlaceholder([]interface{}(l)) }
 
+type LiteralNull struct{}
+
+func (LiteralNull) IsCompound() bool           { return false }
+func (LiteralNull) String(Ctx) (string, error) { return "NULL", nil }
+func (LiteralNull) IsNull(Ctx) bool            { return true }
+
 func Literal(value interface{}) Expression {
+	if value == nil {
+		return &Expr{LiteralNull{}}
+	}
 	switch value := value.(type) {
 	case int:
 		return &Expr{LiteralInt64(value)}
@@ -132,7 +145,7 @@ func operandToExpression(v interface{}) Expression {
 	switch v := v.(type) {
 	case Expression:
 		return v
-	case int, int32, int64, string:
+	case int, int32, int64, string, nil:
 		return Literal(v)
 	default:
 		panic(fmt.Errorf("Cannot create an expression from %v [%v]", v, reflect.TypeOf(v)))
@@ -140,7 +153,8 @@ func operandToExpression(v interface{}) Expression {
 }
 
 func toInterfaceSlice(v interface{}) (result []interface{}, ok bool) {
-	if reflect.TypeOf(v).Kind() != reflect.Slice {
+	t := reflect.TypeOf(v)
+	if t == nil || t.Kind() != reflect.Slice {
 		return nil, false
 	}
 	ok = true
@@ -191,6 +205,11 @@ type Binding struct {
 
 func (b *Binding) String(c Ctx) (string, error) {
 	return c.DynamicPlaceholder(b)
+}
+
+func (b *Binding) IsNull(c Ctx) bool {
+	v, ok := c.BindValue(b)
+	return ok && v == nil
 }
 
 func Bind(name string) Expression {

@@ -34,6 +34,11 @@ type Expr struct {
 	Node
 }
 
+func (e *Expr) IsNull(c Ctx) bool {
+	nullable, ok := e.Node.(Nullable)
+	return ok && nullable.IsNull(c)
+}
+
 func (e *Expr) Plus(other interface{}) Expression {
 	return Binary(e, "+", other)
 }

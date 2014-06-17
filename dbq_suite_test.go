@@ -169,27 +169,28 @@ var _ = Describe("dbq", func() {
 			Expect(sql).To(Equal("42 = $1"))
 			Expect(v[0].(string)).To(Equal("42"))
 		})
+		It("should support = with nulls", func() {
+			expr := Ident("x").Eq(nil)
+			Expect(Q(expr)).To(Equal("x IS NULL"))
+		})
+		It("should support != with nulls", func() {
+			expr := Ident("x").NotEq(nil)
+			Expect(Q(expr)).To(Equal("x IS NOT NULL"))
+		})
 	})
 
 	Describe("Bind()", func() {
-		It("should be usable as an expression", func() {
-			e := q.Select().From("t").Where(Ident("x").Eq(Bind("myValue")))
-			sql, v := QB(e)
-			Expect(sql).To(Equal("SELECT * FROM t WHERE x = ($1)"))
-			Expect(v).To(HaveLen(1))
-			Expect(v[0]).To(BeNil())
-		})
-		It("should be reusable", func() {
-			e := q.Select().From("t").Where(Bind("myValue").Eq(Bind("myValue")))
-			sql, v := QB(e)
-			Expect(sql).To(Equal("SELECT * FROM t WHERE ($1) = ($1)"))
-			Expect(v).To(HaveLen(1))
-			Expect(v[0]).To(BeNil())
-		})
 		It("should be mappable to values", func() {
 			e := q.Select().From("t").Where(Ident("x").Eq(Bind("myValue")))
 			sql, v, _ := q.SQL(e, Args{"myValue": 42})
 			Expect(sql).To(Equal("SELECT * FROM t WHERE x = ($1)"))
+			Expect(v).To(HaveLen(1))
+			Expect(v[0]).To(Equal(42))
+		})
+		It("should be reusable", func() {
+			e := q.Select().From("t").Where(Bind("myValue").Eq(Bind("myValue")))
+			sql, v, _ := q.SQL(e, Args{"myValue": 42})
+			Expect(sql).To(Equal("SELECT * FROM t WHERE ($1) = ($1)"))
 			Expect(v).To(HaveLen(1))
 			Expect(v[0]).To(Equal(42))
 		})
@@ -200,6 +201,12 @@ var _ = Describe("dbq", func() {
 			Expect(v).To(HaveLen(2))
 			Expect(v[0]).To(Equal("meh"))
 			Expect(v[1]).To(Equal(42))
+		})
+		It("should support = with nulls", func() {
+			e := q.Select().From("t").Where(Ident("x").Eq(Bind("myValue")))
+			sql, v, _ := q.SQL(e, Args{"myValue": nil})
+			Expect(sql).To(Equal("SELECT * FROM t WHERE x IS NULL"))
+			Expect(v).To(BeEmpty())
 		})
 	})
 
