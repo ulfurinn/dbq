@@ -11,10 +11,11 @@ type SelectQuery struct {
 }
 
 type SelectExpr struct {
-	distinct   bool
-	columns    []Node
-	tables     []Node
-	conditions []Expression
+	distinct      bool
+	columns       []Node
+	tables        []Node
+	conditions    []Expression
+	limit, offset uint
 	Compound
 }
 
@@ -159,5 +160,16 @@ func (s *SelectQuery) Where(specs ...interface{}) *SelectQuery {
 			panic(fmt.Errorf("Cannot use %v [%v] as a condition", spec, reflect.TypeOf(spec)))
 		}
 	}
+	return s
+}
+func (s *SelectQuery) Limit(l uint) *SelectQuery {
+	ex := s.expr()
+	ex.limit = l
+	return s
+}
+
+func (s *SelectQuery) Offset(o uint) *SelectQuery {
+	ex := s.expr()
+	ex.offset = o
 	return s
 }

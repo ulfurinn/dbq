@@ -130,6 +130,12 @@ func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
 		}
 		sql += " WHERE " + conditionSQL
 	}
+	if s.limit > 0 {
+		sql += fmt.Sprintf(" LIMIT %d", s.limit)
+	}
+	if s.offset > 0 {
+		sql += fmt.Sprintf(" OFFSET %d", s.offset)
+	}
 	return
 }
 
