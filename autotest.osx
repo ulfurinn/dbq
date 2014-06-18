@@ -1,0 +1,3 @@
+#!/bin/bash
+clear && go test
+fswatch -o . | xargs -n1 -I{} bash -c 'clear && go test'
