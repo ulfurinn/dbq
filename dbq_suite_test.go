@@ -51,6 +51,15 @@ var _ = Describe("dbq", func() {
 		q = NewQ(db, PostgresDialect{})
 	})
 
+	Describe("Expression", func() {
+
+		It("should be castable", func() {
+			e := Literal(2).Plus(2).Cast("double precision")
+			Expect(Q(e)).To(Equal("(2 + 2)::double precision"))
+		})
+
+	})
+
 	Describe("Select", func() {
 		var s *SelectQuery
 

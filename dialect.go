@@ -16,4 +16,5 @@ type Ctx interface {
 	JoinCondition(*JoinCondition) (string, error)
 	In(*InExpr) (string, error)
 	BindValue(*Binding) (interface{}, bool)
+	Cast(*CastExpr) (string, error)
 }

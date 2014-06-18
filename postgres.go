@@ -258,3 +258,12 @@ func (c *PostgresCtx) In(in *InExpr) (sql string, err error) {
 	}
 	return element + " IN " + list, nil
 }
+
+func (c *PostgresCtx) Cast(cast *CastExpr) (sql string, err error) {
+	sql, err = cast.e.String(c)
+	if err != nil {
+		return
+	}
+	sql = "(" + sql + ")::" + cast.typ
+	return
+}

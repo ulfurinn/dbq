@@ -29,6 +29,8 @@ type Expression interface {
 
 	And(other interface{}) Expression
 	Or(other interface{}) Expression
+
+	Cast(string) Expression
 }
 type Expr struct {
 	Node
@@ -77,4 +79,7 @@ func (e *Expr) Or(other interface{}) Expression {
 }
 func (e *Expr) In(other interface{}) Expression {
 	return In(e, other)
+}
+func (e *Expr) Cast(typ string) Expression {
+	return Cast(e, typ)
 }

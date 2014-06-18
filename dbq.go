@@ -215,3 +215,17 @@ func (b *Binding) IsNull(c Ctx) bool {
 func Bind(name string) Expression {
 	return &Expr{&Binding{name: name}}
 }
+
+type CastExpr struct {
+	e   Expression
+	typ string
+	Primitive
+}
+
+func Cast(e Expression, typ string) Expression {
+	return &Expr{&CastExpr{e: e, typ: typ}}
+}
+
+func (cast *CastExpr) String(c Ctx) (string, error) {
+	return c.Cast(cast)
+}
