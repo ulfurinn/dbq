@@ -119,6 +119,15 @@ var _ = Describe("dbq", func() {
 				s := q.Select().From("t").Where(Args{"x": 42})
 				Expect(Q(s)).To(Equal("SELECT * FROM t WHERE x = 42"))
 			})
+			It("should take lists in a map", func() {
+				s := q.Select().From("t").Where(Args{"x": []int{42, 57}}).Where(Args{"y": []string{"c"}})
+				sql, v := QB(s)
+				Expect(sql).To(Equal("SELECT * FROM t WHERE x IN ($1,$2) AND y IN ($3)"))
+				Expect(v).To(HaveLen(3))
+				Expect(v[0]).To(Equal(42))
+				Expect(v[1]).To(Equal(57))
+				Expect(v[2]).To(Equal("c"))
+			})
 		})
 
 	})

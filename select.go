@@ -152,7 +152,13 @@ func (s *SelectQuery) Where(specs ...interface{}) *SelectQuery {
 		switch spec := spec.(type) {
 		case Args:
 			for ident, value := range spec {
-				ex.conditions = append(ex.conditions, Ident(ident).Eq(value))
+				col := Ident(ident)
+				if reflect.ValueOf(value).Kind() == reflect.Slice {
+					ex.conditions = append(ex.conditions, col.In(value))
+				} else {
+					ex.conditions = append(ex.conditions, col.Eq(value))
+				}
+
 			}
 		case Expression:
 			ex.conditions = append(ex.conditions, spec)
