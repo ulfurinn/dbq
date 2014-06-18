@@ -1,3 +1,7 @@
 language: go
 install:
   - go get -d -t ./...
+before_script:
+  - psql -c 'create database dbqtestdb' -U postgres
+script:
+  - env PGUSER=postgres go test ./...

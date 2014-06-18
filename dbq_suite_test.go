@@ -2,7 +2,7 @@ package dbq
 
 import (
 	"database/sql"
-	"fmt"
+	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -19,12 +19,29 @@ func TestDbq(t *testing.T) {
 	RunSpecs(t, "Dbq Suite")
 }
 
-func dsn() string {
-	return fmt.Sprintf("user=%s dbname=%s host=%s sslmode=disable", User, Db, Host)
+func testenv(key, value string) {
+	if os.Getenv(key) == "" {
+		os.Setenv(key, value)
+	}
+}
+
+func exec(db *sql.DB, q string) {
+	_, err := db.Exec(q)
+	if err != nil {
+		Fail(err.Error())
+	}
+}
+
+func testschema(db *sql.DB) {
+	exec(db, "CREATE TABLE test ( id serial, a integer, b integer, primary key (id) )")
 }
 
 var _ = Describe("dbq", func() {
-	db, dberr := sql.Open("postgres", dsn())
+	testenv("PGDATABASE", Db)
+	testenv("PGHOST", Host)
+	testenv("PGSSLMODE", "disable")
+	testenv("PGUSER", User)
+	db, dberr := sql.Open("postgres", "")
 
 	var q *Dbq
 	Q := func(e Expression) string {
@@ -53,6 +70,7 @@ var _ = Describe("dbq", func() {
 		if err != nil {
 			Fail(err.Error())
 		}
+
 	})
 
 	AfterEach(func() {
@@ -149,6 +167,7 @@ var _ = Describe("dbq", func() {
 
 		Describe("Into()", func() {
 			It("should accept a scalar", func() {
+				testschema(db)
 				_, e := db.Exec("INSERT INTO test (a, b) VALUES (42, 1)")
 				if e != nil {
 					Fail(e.Error())
@@ -161,6 +180,7 @@ var _ = Describe("dbq", func() {
 				Expect(a).To(Equal(42))
 			})
 			It("should accept a list of scalars", func() {
+				testschema(db)
 				_, e := db.Exec("INSERT INTO test (a, b) VALUES (42, 1), (43, 2)")
 				if e != nil {
 					Fail(e.Error())
