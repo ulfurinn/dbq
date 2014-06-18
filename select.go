@@ -7,7 +7,8 @@ import (
 
 type SelectQuery struct {
 	Expr
-	q *Dbq
+	q           *Dbq
+	scalarClone *SelectQuery
 }
 
 type SelectExpr struct {
@@ -17,6 +18,11 @@ type SelectExpr struct {
 	conditions    []Expression
 	limit, offset uint
 	Compound
+}
+
+func (s *SelectExpr) clone() *SelectExpr {
+	cl := *s
+	return &cl
 }
 
 type Distinct struct{}
@@ -178,4 +184,95 @@ func (s *SelectQuery) Offset(o uint) *SelectQuery {
 	ex := s.expr()
 	ex.offset = o
 	return s
+}
+
+func isScalar(k reflect.Kind) bool {
+	return !(k == reflect.Array || k == reflect.Chan || k == reflect.Func || k == reflect.Interface ||
+		k == reflect.Map || k == reflect.Slice || k == reflect.Struct ||
+		k == reflect.Uintptr || k == reflect.UnsafePointer)
+}
+
+func (s *SelectQuery) Into(target interface{}, args ...Args) error {
+	arg := Args{}
+	for _, a := range args {
+		for k, v := range a {
+			arg[k] = v
+		}
+	}
+
+	v := reflect.ValueOf(target)
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf("Into() expects a pointer")
+	}
+	if v.Elem().Kind() == reflect.Slice {
+		if v.Type().Elem().Elem().Kind() == reflect.Struct {
+			return fmt.Errorf("structs are not implemented")
+		}
+		// list of scalars
+
+		sql, values, e := s.q.SQL(s, arg)
+		if e != nil {
+			return e
+		}
+		rows, e := s.q.Query(sql, values...)
+		if e != nil {
+			return e
+		}
+		defer rows.Close()
+		cols, e := rows.Columns()
+		if e != nil {
+			return e
+		}
+
+		arr := v.Elem()
+
+		for rows.Next() {
+			acceptor := reflect.New(v.Type().Elem().Elem())
+			acceptors := []interface{}{acceptor.Interface()}
+			for i := 0; i < len(cols)-1; i++ {
+				acceptors = append(acceptors, new([]byte))
+			}
+			e = rows.Scan(acceptors...)
+			if e != nil {
+				return e
+			}
+			arr = reflect.Append(arr, reflect.ValueOf(acceptors[0]).Elem())
+		}
+		v.Elem().Set(arr)
+		return nil
+
+	} else {
+		if s.scalarClone == nil {
+			s.scalarClone = &SelectQuery{Expr: Expr{Node: s.expr().clone()}, q: s.q}
+			s.scalarClone.Limit(1)
+		}
+		if v.Elem().Kind() == reflect.Struct {
+			return fmt.Errorf("structs are not implemented")
+		}
+		sql, values, e := s.q.SQL(s.scalarClone, arg)
+		if e != nil {
+			return e
+		}
+		rows, e := s.q.Query(sql, values...)
+		if e != nil {
+			return e
+		}
+		defer rows.Close()
+		cols, e := rows.Columns()
+		if e != nil {
+			return e
+		}
+		acceptors := []interface{}{v.Interface()}
+		for i := 0; i < len(cols)-1; i++ {
+			acceptors = append(acceptors, new([]byte))
+		}
+		for rows.Next() {
+			e = rows.Scan(acceptors...)
+			if e != nil {
+				return e
+			}
+		}
+	}
+
+	return nil
 }

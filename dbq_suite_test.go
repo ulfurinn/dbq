@@ -20,7 +20,7 @@ func TestDbq(t *testing.T) {
 }
 
 func dsn() string {
-	return fmt.Sprintf("user=%s dbname=%s host=%s", User, Db, Host)
+	return fmt.Sprintf("user=%s dbname=%s host=%s sslmode=disable", User, Db, Host)
 }
 
 var _ = Describe("dbq", func() {
@@ -49,6 +49,14 @@ var _ = Describe("dbq", func() {
 			Fail(dberr.Error())
 		}
 		q = NewQ(db, PostgresDialect{})
+		_, err := db.Exec("BEGIN")
+		if err != nil {
+			Fail(err.Error())
+		}
+	})
+
+	AfterEach(func() {
+		db.Exec("ROLLBACK")
 	})
 
 	Describe("Expression", func() {
@@ -136,6 +144,35 @@ var _ = Describe("dbq", func() {
 				Expect(v[0]).To(Equal(42))
 				Expect(v[1]).To(Equal(57))
 				Expect(v[2]).To(Equal("c"))
+			})
+		})
+
+		Describe("Into()", func() {
+			It("should accept a scalar", func() {
+				_, e := db.Exec("INSERT INTO test (a, b) VALUES (42, 1)")
+				if e != nil {
+					Fail(e.Error())
+				}
+				var a int
+				e = q.Select(Ident("a")).From("test").Into(&a)
+				if e != nil {
+					Fail(e.Error())
+				}
+				Expect(a).To(Equal(42))
+			})
+			It("should accept a list of scalars", func() {
+				_, e := db.Exec("INSERT INTO test (a, b) VALUES (42, 1), (43, 2)")
+				if e != nil {
+					Fail(e.Error())
+				}
+				var a []int
+				e = q.Select(Ident("a")).From("test").Into(&a)
+				if e != nil {
+					Fail(e.Error())
+				}
+				Expect(a).To(HaveLen(2))
+				Expect(a[0]).To(Equal(42))
+				Expect(a[1]).To(Equal(43))
 			})
 		})
 
