@@ -195,6 +195,7 @@ var _ = Describe("dbq", func() {
 				Expect(a[1]).To(Equal(43))
 			})
 			It("should accept a struct", func() {
+				testschema(db)
 				_, e := db.Exec("INSERT INTO test (a, b) VALUES (42, 1)")
 				if e != nil {
 					Fail(e.Error())
@@ -212,6 +213,7 @@ var _ = Describe("dbq", func() {
 				Expect(a.B).To(Equal(1))
 			})
 			It("should accept a list of structs", func() {
+				testschema(db)
 				_, e := db.Exec("INSERT INTO test (a, b) VALUES (42, 1), (43, 2)")
 				if e != nil {
 					Fail(e.Error())
