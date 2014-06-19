@@ -1,14 +1,16 @@
 package dbq
 
 import (
+	"database/sql"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 type SelectQuery struct {
 	Expr
 	q           *Dbq
-	scalarClone *SelectQuery
+	singleClone *SelectQuery
 }
 
 type SelectExpr struct {
@@ -193,6 +195,11 @@ func isScalar(k reflect.Kind) bool {
 }
 
 func (s *SelectQuery) Into(target interface{}, args ...Args) error {
+	v := reflect.ValueOf(target)
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf("Into() expects a pointer")
+	}
+
 	arg := Args{}
 	for _, a := range args {
 		for k, v := range a {
@@ -200,79 +207,124 @@ func (s *SelectQuery) Into(target interface{}, args ...Args) error {
 		}
 	}
 
-	v := reflect.ValueOf(target)
-	if v.Kind() != reflect.Ptr {
-		return fmt.Errorf("Into() expects a pointer")
-	}
 	if v.Elem().Kind() == reflect.Slice {
-		if v.Type().Elem().Elem().Kind() == reflect.Struct {
-			return fmt.Errorf("structs are not implemented")
-		}
-		// list of scalars
-
-		sql, values, e := s.q.SQL(s, arg)
-		if e != nil {
-			return e
-		}
-		rows, e := s.q.Query(sql, values...)
-		if e != nil {
-			return e
-		}
-		defer rows.Close()
-		cols, e := rows.Columns()
-		if e != nil {
-			return e
-		}
-
-		arr := v.Elem()
-
-		for rows.Next() {
-			acceptor := reflect.New(v.Type().Elem().Elem())
-			acceptors := []interface{}{acceptor.Interface()}
-			for i := 0; i < len(cols)-1; i++ {
-				acceptors = append(acceptors, new([]byte))
-			}
-			e = rows.Scan(acceptors...)
-			if e != nil {
-				return e
-			}
-			arr = reflect.Append(arr, reflect.ValueOf(acceptors[0]).Elem())
-		}
-		v.Elem().Set(arr)
-		return nil
-
+		return s.selectRows(v, arg)
 	} else {
-		if s.scalarClone == nil {
-			s.scalarClone = &SelectQuery{Expr: Expr{Node: s.expr().clone()}, q: s.q}
-			s.scalarClone.Limit(1)
+		if s.singleClone == nil {
+			s.singleClone = &SelectQuery{Expr: Expr{Node: s.expr().clone()}, q: s.q}
+			s.singleClone.Limit(1)
 		}
-		if v.Elem().Kind() == reflect.Struct {
-			return fmt.Errorf("structs are not implemented")
-		}
-		sql, values, e := s.q.SQL(s.scalarClone, arg)
-		if e != nil {
-			return e
-		}
-		rows, e := s.q.Query(sql, values...)
-		if e != nil {
-			return e
-		}
-		defer rows.Close()
-		cols, e := rows.Columns()
-		if e != nil {
-			return e
-		}
-		acceptors := []interface{}{v.Interface()}
-		for i := 0; i < len(cols)-1; i++ {
-			acceptors = append(acceptors, new([]byte))
-		}
-		for rows.Next() {
-			e = rows.Scan(acceptors...)
-			if e != nil {
-				return e
-			}
-		}
+		return s.singleClone.selectSingleRow(v, arg)
+	}
+}
+
+func (s *SelectQuery) selectRows(v reflect.Value, arg Args) error {
+	targetType := v.Type().Elem().Elem()
+	isStruct := targetType.Kind() == reflect.Struct
+	isSc := isScalar(targetType.Kind())
+	if !isStruct && !isSc {
+		return fmt.Errorf("only scalars and structs are implemented")
 	}
 
+	rows, cols, err := s.execute(arg)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	targetSlice := v.Elem()
+
+	for rows.Next() {
+		acceptor := reflect.New(targetType)
+		if isSc {
+			err = scanScalar(acceptor, rows, cols)
+		} else if isStruct {
+			err = scanStruct(acceptor, rows, cols)
+		}
+		if err != nil {
+			return err
+		}
+		targetSlice = reflect.Append(targetSlice, acceptor.Elem())
+	}
+	v.Elem().Set(targetSlice)
 	return nil
+
+}
+
+func (s *SelectQuery) selectSingleRow(v reflect.Value, arg Args) error {
+	isStruct := v.Elem().Kind() == reflect.Struct
+	isSc := isScalar(v.Elem().Kind())
+	if !isStruct && !isSc {
+		return fmt.Errorf("only scalars and structs are implemented")
+	}
+
+	rows, cols, err := s.execute(arg)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	scannedAny := false
+	for rows.Next() {
+		scannedAny = true
+		if isSc {
+			err = scanScalar(v, rows, cols)
+		} else if isStruct {
+			err = scanStruct(v, rows, cols)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if !scannedAny {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func (s *SelectQuery) execute(arg Args) (rows *sql.Rows, cols []string, err error) {
+	q, values, err := s.q.SQL(s, arg)
+	if err != nil {
+		return
+	}
+	rows, err = s.q.Query(q, values...)
+	if err != nil {
+		return
+	}
+	cols, err = rows.Columns()
+	return
+}
+
+func scanScalar(v reflect.Value, rows *sql.Rows, cols []string) (err error) {
+	acceptor := v.Interface()
+	acceptors := []interface{}{acceptor}
+	//	TODO: are there cheaper dummy values? RawBytes?
+	for i := 0; i < len(cols)-1; i++ {
+		acceptors = append(acceptors, new([]byte))
+	}
+	err = rows.Scan(acceptors...)
+	return
+}
+
+//	v: pointer to struct
+func scanStruct(v reflect.Value, rows *sql.Rows, cols []string) (err error) {
+	str := v.Elem()
+	strT := v.Type().Elem()
+	acceptors := make([]interface{}, len(cols))
+	for i, col := range cols {
+		acceptors[i] = mapColumnToAcceptor(col, str, strT)
+	}
+	err = rows.Scan(acceptors...)
+	return
+}
+
+// v: struct
+func mapColumnToAcceptor(col string, v reflect.Value, t reflect.Type) interface{} {
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if strings.ToLower(f.Name) == col {
+			return v.Field(i).Addr().Interface()
+		}
+	}
+	return new([]byte)
 }

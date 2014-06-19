@@ -174,6 +174,43 @@ var _ = Describe("dbq", func() {
 				Expect(a[0]).To(Equal(42))
 				Expect(a[1]).To(Equal(43))
 			})
+			It("should accept a struct", func() {
+				_, e := db.Exec("INSERT INTO test (a, b) VALUES (42, 1)")
+				if e != nil {
+					Fail(e.Error())
+				}
+				var a struct {
+					ID int
+					A  int
+					B  int
+				}
+				e = q.Select().From("test").Into(&a)
+				if e != nil {
+					Fail(e.Error())
+				}
+				Expect(a.A).To(Equal(42))
+				Expect(a.B).To(Equal(1))
+			})
+			It("should accept a list of structs", func() {
+				_, e := db.Exec("INSERT INTO test (a, b) VALUES (42, 1), (43, 2)")
+				if e != nil {
+					Fail(e.Error())
+				}
+				var a []struct {
+					ID int
+					A  int
+					B  int
+				}
+				e = q.Select().From("test").Into(&a)
+				if e != nil {
+					Fail(e.Error())
+				}
+				Expect(a).To(HaveLen(2))
+				Expect(a[0].A).To(Equal(42))
+				Expect(a[0].B).To(Equal(1))
+				Expect(a[1].A).To(Equal(43))
+				Expect(a[1].B).To(Equal(2))
+			})
 		})
 
 	})
