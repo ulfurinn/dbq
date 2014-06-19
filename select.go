@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 )
 
 type SelectQuery struct {
@@ -188,7 +189,21 @@ func (s *SelectQuery) Offset(o uint) *SelectQuery {
 	return s
 }
 
-func isScalar(k reflect.Kind) bool {
+func isScannable(t reflect.Type) bool {
+	iface := reflect.Zero(t).Interface()
+	_, isScanner := iface.(sql.Scanner)
+	_, isBuffer := iface.([]byte)
+	_, isTime := iface.(time.Time)
+	return isScanner || isBuffer || isTime
+}
+
+//	TODO: support []byte and time.Time
+
+func isScalar(t reflect.Type) bool {
+	if isScannable(t) {
+		return true
+	}
+	k := t.Kind()
 	return !(k == reflect.Array || k == reflect.Chan || k == reflect.Func || k == reflect.Interface ||
 		k == reflect.Map || k == reflect.Slice || k == reflect.Struct ||
 		k == reflect.Uintptr || k == reflect.UnsafePointer)
@@ -221,7 +236,7 @@ func (s *SelectQuery) Into(target interface{}, args ...Args) error {
 func (s *SelectQuery) selectRows(v reflect.Value, arg Args) error {
 	targetType := v.Type().Elem().Elem()
 	isStruct := targetType.Kind() == reflect.Struct
-	isSc := isScalar(targetType.Kind())
+	isSc := isScalar(targetType)
 	if !isStruct && !isSc {
 		return fmt.Errorf("only scalars and structs are implemented")
 	}
@@ -253,7 +268,7 @@ func (s *SelectQuery) selectRows(v reflect.Value, arg Args) error {
 
 func (s *SelectQuery) selectSingleRow(v reflect.Value, arg Args) error {
 	isStruct := v.Elem().Kind() == reflect.Struct
-	isSc := isScalar(v.Elem().Kind())
+	isSc := isScalar(v.Type().Elem())
 	if !isStruct && !isSc {
 		return fmt.Errorf("only scalars and structs are implemented")
 	}
@@ -317,6 +332,8 @@ func scanStruct(v reflect.Value, rows *sql.Rows, cols []string) (err error) {
 	err = rows.Scan(acceptors...)
 	return
 }
+
+// TODO: work around nullable primitives
 
 // v: struct
 func mapColumnToAcceptor(col string, v reflect.Value, t reflect.Type) interface{} {
