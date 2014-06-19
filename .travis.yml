@@ -4,4 +4,4 @@ install:
 before_script:
   - psql -c 'create database dbqtestdb' -U postgres
 script:
-  - env PGUSER=postgres go test ./...
+  - env PGUSER=postgres go test
