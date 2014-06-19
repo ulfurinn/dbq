@@ -17,4 +17,5 @@ type Ctx interface {
 	In(*InExpr) (string, error)
 	BindValue(*Binding) (interface{}, bool)
 	Cast(*CastExpr) (string, error)
+	Func(*FuncExpr) (string, error)
 }

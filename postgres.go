@@ -267,3 +267,15 @@ func (c *PostgresCtx) Cast(cast *CastExpr) (sql string, err error) {
 	sql = "(" + sql + ")::" + cast.typ
 	return
 }
+
+func (c *PostgresCtx) Func(f *FuncExpr) (sql string, err error) {
+	args := []string{}
+	for _, e := range f.values {
+		arg, err := e.String(c)
+		if err != nil {
+			return "", err
+		}
+		args = append(args, arg)
+	}
+	return f.name + "(" + strings.Join(args, ", ") + ")", nil
+}

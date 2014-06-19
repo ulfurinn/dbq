@@ -345,4 +345,13 @@ var _ = Describe("dbq", func() {
 		})
 	})
 
+	Describe("Func()", func() {
+		It("should generate function calls", func() {
+			Expect(Q(Func("now"))).To(Equal("now()"))
+		})
+		It("should generate function calls with arguments", func() {
+			Expect(Q(Func("myfunc", Literal(42)))).To(Equal("myfunc(42)"))
+		})
+	})
+
 })

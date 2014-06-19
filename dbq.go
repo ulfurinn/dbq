@@ -229,3 +229,17 @@ func Cast(e Expression, typ string) Expression {
 func (cast *CastExpr) String(c Ctx) (string, error) {
 	return c.Cast(cast)
 }
+
+type FuncExpr struct {
+	name   string
+	values []Expression
+	Primitive
+}
+
+func (f *FuncExpr) String(c Ctx) (string, error) {
+	return c.Func(f)
+}
+
+func Func(name string, args ...Expression) Expression {
+	return &Expr{&FuncExpr{name: name, values: args}}
+}
