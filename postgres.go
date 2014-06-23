@@ -279,3 +279,25 @@ func (c *PostgresCtx) Func(f *FuncExpr) (sql string, err error) {
 	}
 	return f.name + "(" + strings.Join(args, ", ") + ")", nil
 }
+
+func (c *PostgresCtx) AggFunc(f *AggFuncExpr) (sql string, err error) {
+	if f.distinct && f.all {
+		return "", fmt.Errorf("an aggregate function cannot use both DISTINCT and ALL")
+	}
+	args := []string{}
+	for _, e := range f.values {
+		arg, err := e.String(c)
+		if err != nil {
+			return "", err
+		}
+		args = append(args, arg)
+	}
+	var qualifier string
+	if f.distinct {
+		qualifier = "DISTINCT "
+	}
+	if f.all {
+		qualifier = "ALL "
+	}
+	return f.name + "(" + qualifier + strings.Join(args, ", ") + ")", nil
+}

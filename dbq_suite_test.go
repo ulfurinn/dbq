@@ -353,5 +353,13 @@ var _ = Describe("dbq", func() {
 			Expect(Q(Func("myfunc", Literal(42)))).To(Equal("myfunc(42)"))
 		})
 	})
+	Describe("AggFunc()", func() {
+		It("should use DISTINCT", func() {
+			Expect(Q(AggFunc("count", Distinct{}, Ident("x")))).To(Equal("count(DISTINCT x)"))
+		})
+		It("should use ALL", func() {
+			Expect(Q(AggFunc("count", All{}, Ident("x")))).To(Equal("count(ALL x)"))
+		})
+	})
 
 })

@@ -29,6 +29,7 @@ func (s *SelectExpr) clone() *SelectExpr {
 }
 
 type Distinct struct{}
+type All struct{}
 
 func (q *Dbq) Select(spec ...interface{}) *SelectQuery {
 	node := &SelectExpr{}

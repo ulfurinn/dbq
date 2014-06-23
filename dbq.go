@@ -243,3 +243,30 @@ func (f *FuncExpr) String(c Ctx) (string, error) {
 func Func(name string, args ...Expression) Expression {
 	return &Expr{&FuncExpr{name: name, values: args}}
 }
+
+type AggFuncExpr struct {
+	name          string
+	values        []Expression
+	distinct, all bool
+	Primitive
+}
+
+func (f *AggFuncExpr) String(c Ctx) (string, error) {
+	return c.AggFunc(f)
+}
+
+func AggFunc(name string, args ...interface{}) Expression {
+	e := &AggFuncExpr{name: name, values: []Expression{}}
+	for _, arg := range args {
+		switch arg := arg.(type) {
+		case Distinct:
+			e.distinct = true
+		case All:
+			e.all = true
+		case Expression:
+			e.values = append(e.values, arg)
+			//	TODO: order
+		}
+	}
+	return &Expr{e}
+}
