@@ -49,7 +49,7 @@ type PostgresCtx struct {
 	dynamicValues            Args
 }
 
-func (c PostgresCtx) BindValue(b *Binding) (value interface{}, ok bool) {
+func (c *PostgresCtx) BindValue(b *Binding) (value interface{}, ok bool) {
 	value, ok = c.dynamicValues[b.name]
 	return
 }
