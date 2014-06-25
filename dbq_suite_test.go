@@ -165,6 +165,13 @@ var _ = Describe("dbq", func() {
 			})
 		})
 
+		Describe("Order()", func() {
+			It("should sort by expression", func() {
+				e := q.Select().From("t").OrderBy(Order("x", "asc"))
+				Expect(Q(e)).To(Equal("SELECT * FROM t ORDER BY x ASC"))
+			})
+		})
+
 		Describe("Into()", func() {
 			It("should accept a scalar", func() {
 				testschema(db)
@@ -359,6 +366,10 @@ var _ = Describe("dbq", func() {
 		})
 		It("should use ALL", func() {
 			Expect(Q(AggFunc("count", All{}, Ident("x")))).To(Equal("count(ALL x)"))
+		})
+		It("should use order", func() {
+			e := AggFunc("count", Ident("x"), OrderBy(Order("x", "asc")))
+			Expect(Q(e)).To(Equal("count(x ORDER BY x ASC)"))
 		})
 	})
 

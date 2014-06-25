@@ -130,6 +130,13 @@ func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
 		}
 		sql += " WHERE " + conditionSQL
 	}
+	if s.order != nil {
+		order, err := s.order.String(c)
+		if err != nil {
+			return "", nil
+		}
+		sql += order
+	}
 	if s.limit > 0 {
 		sql += fmt.Sprintf(" LIMIT %d", s.limit)
 	}
@@ -299,5 +306,34 @@ func (c *PostgresCtx) AggFunc(f *AggFuncExpr) (sql string, err error) {
 	if f.all {
 		qualifier = "ALL "
 	}
-	return f.name + "(" + qualifier + strings.Join(args, ", ") + ")", nil
+	var order string
+	if f.order != nil {
+		order, err = f.order.String(c)
+		if err != nil {
+			return
+		}
+	}
+	return f.name + "(" + qualifier + strings.Join(args, ", ") + order + ")", nil
+}
+
+func (c *PostgresCtx) OrderBy(order *OrderExpr) (sql string, err error) {
+	if len(order.exprs) == 0 {
+		return
+	}
+	parts := []string{}
+	for _, o := range order.exprs {
+		part, err := o.column.String(c)
+		if err != nil {
+			return "", err
+		}
+		if o.order == OrderAsc {
+			part += " ASC"
+		}
+		if o.order == OrderDesc {
+			part += " DESC"
+		}
+		parts = append(parts, part)
+	}
+	sql = " ORDER BY " + strings.Join(parts, ", ")
+	return
 }

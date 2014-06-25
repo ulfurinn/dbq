@@ -23,4 +23,5 @@ type Ctx interface {
 	Cast(*CastExpr) (string, error)
 	Func(*FuncExpr) (string, error)
 	AggFunc(*AggFuncExpr) (string, error)
+	OrderBy(*OrderExpr) (string, error)
 }

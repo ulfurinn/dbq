@@ -275,6 +275,7 @@ type AggFuncExpr struct {
 	name          string
 	values        []Expression
 	distinct, all bool
+	order         Node
 	Primitive
 }
 
@@ -292,8 +293,75 @@ func AggFunc(name string, args ...interface{}) Expression {
 			e.all = true
 		case Expression:
 			e.values = append(e.values, arg)
-			//	TODO: order
+		case *OrderExpr:
+			e.order = arg
 		}
 	}
 	return &Expr{e}
+}
+
+type OrderExpr struct {
+	exprs []OrderClause
+	Primitive
+}
+
+type OrderKind int
+
+const (
+	OrderDefault OrderKind = iota
+	OrderAsc     OrderKind = iota
+	OrderDesc    OrderKind = iota
+)
+
+type OrderClause struct {
+	column Expression
+	order  OrderKind
+}
+
+func (order *OrderExpr) String(c Ctx) (string, error) {
+	return c.OrderBy(order)
+}
+
+func OrderBy(clauses ...interface{}) *OrderExpr {
+	orderExpr := &OrderExpr{}
+	for _, clause := range clauses {
+		order := OrderClause{order: OrderDefault}
+		switch clause := clause.(type) {
+		case string:
+			order.column = Ident(clause)
+		case Expression:
+			order.column = clause
+		case OrderClause:
+			order = clause
+		}
+		orderExpr.exprs = append(orderExpr.exprs, order)
+	}
+	return orderExpr
+}
+
+func Order(column interface{}, order interface{}) (result OrderClause) {
+	switch column := column.(type) {
+	case string:
+		result.column = Ident(column)
+	case Expression:
+		result.column = column
+	default:
+		panic(fmt.Errorf("cannot create an order clause from %v [%v]", column, reflect.TypeOf(column)))
+	}
+	switch order := order.(type) {
+	case OrderKind:
+		result.order = order
+	case string:
+		switch order {
+		case "asc", "ASC":
+			result.order = OrderAsc
+		case "desc", "DESC":
+			result.order = OrderDesc
+		default:
+			result.order = OrderDefault
+		}
+	default:
+		panic(fmt.Errorf("cannot create an order clause from %v [%v]", order, reflect.TypeOf(order)))
+	}
+	return
 }

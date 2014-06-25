@@ -21,6 +21,7 @@ type SelectExpr struct {
 	columns       []Node
 	tables        []Node
 	conditions    []Expression
+	order         Node
 	limit, offset uint
 	Compound
 }
@@ -199,6 +200,11 @@ func (s *SelectQuery) Limit(l uint) *SelectQuery {
 func (s *SelectQuery) Offset(o uint) *SelectQuery {
 	ex := s.expr()
 	ex.offset = o
+	return s
+}
+
+func (s *SelectQuery) OrderBy(clauses ...interface{}) *SelectQuery {
+	s.expr().order = OrderBy(clauses...)
 	return s
 }
 
