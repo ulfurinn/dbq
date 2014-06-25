@@ -8,12 +8,14 @@ import (
 	"time"
 )
 
+// SelectQuery is a higher-level interface to SelectExpr.
 type SelectQuery struct {
 	Expr
 	q           *Dbq
 	singleClone *SelectQuery
 }
 
+// SelectExpr represents a SELECT query.
 type SelectExpr struct {
 	distinct      bool
 	columns       []Node
@@ -28,9 +30,19 @@ func (s *SelectExpr) clone() *SelectExpr {
 	return &cl
 }
 
-type Distinct struct{}
-type All struct{}
+type Distinct struct{} // Distinct represents the DISTINCT keyword
+type All struct{}      // All represents the ALL keyword
 
+/*
+Select returns a new SelectQuery.
+
+spec is a column specification. An element can be of types:
+
+	string   // interpreted as a column name
+	Node     // used as is
+	Distinct
+
+*/
 func (q *Dbq) Select(spec ...interface{}) *SelectQuery {
 	node := &SelectExpr{}
 	node.parseSelect(spec)

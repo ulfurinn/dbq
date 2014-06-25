@@ -26,18 +26,19 @@ type Identifier string
 func (Identifier) IsCompound() bool              { return false }
 func (id Identifier) String(Ctx) (string, error) { return string(id), nil }
 
+type IdentExpr struct {
+	Expr
+}
+
 func (id *IdentExpr) Name() string { return string(id.Node.(Identifier)) }
 func (id *IdentExpr) Col(column string) Expression {
 	return &Expr{&ColumnExpr{table: id, column: column}}
 }
 
-type IdentExpr struct {
-	Expr
-}
-
+// Tabular is a value that can represent a table or a table-like expression.
 type Tabular interface {
 	Name() string
-	Col(name string) Expression
+	Col(name string) Expression // creates a column reference
 }
 
 type TabularExpression interface {
@@ -45,6 +46,8 @@ type TabularExpression interface {
 	Expression
 }
 
+// Nullable is used by the equality operator to decide when to use IS NOT/IS NOT NULL instead of =/!=.
+// It is most useful with bindings.
 type Nullable interface {
 	IsNull(Ctx) bool
 }
@@ -59,10 +62,17 @@ func (col *ColumnExpr) String(c Ctx) (string, error) {
 	return c.Column(col)
 }
 
+// NewQ returns a new dbq handle.
 func NewQ(db *sql.DB, d Dialect) *Dbq {
 	return &Dbq{Dialect: d, DB: db}
 }
 
+// Alias returns an alias expression.
+//
+// source can be of the following types:
+//   string - will be cast to an Identifier
+//   Node - will be used as is
+// Anything else will panic.
 func Alias(source interface{}, name string) *AliasExpr {
 	var tabular Node
 	switch source := source.(type) {
@@ -76,20 +86,27 @@ func Alias(source interface{}, name string) *AliasExpr {
 	return &AliasExpr{Expression: Ident(name), Source: tabular}
 }
 
+// Col represents a column expression, using the alias as the table name.
 func (alias *AliasExpr) Col(column string) Expression {
 	return &Expr{&ColumnExpr{table: alias, column: column}}
 }
+
+// Name returns the alias part of the expression.
 func (alias *AliasExpr) Name() string {
 	return alias.Expression.(*IdentExpr).Name()
 }
+
+// String implements Node.
 func (alias *AliasExpr) String(c Ctx) (string, error) {
 	return c.Alias(alias)
 }
 
+// Ident returns an identifier expression.
 func Ident(id string) TabularExpression {
 	return &IdentExpr{Expr: Expr{Identifier(id)}}
 }
 
+// LiteralInt64 represents an SQL integer literal.
 type LiteralInt64 int64
 
 func (LiteralInt64) IsCompound() bool             { return false }
@@ -97,7 +114,11 @@ func (i LiteralInt64) String(Ctx) (string, error) { return strconv.FormatInt(int
 
 type LiteralString string
 
-func (LiteralString) IsCompound() bool               { return false }
+func (LiteralString) IsCompound() bool { return false }
+
+// String returns an implicitly generated placeholder instead of the actual literal.
+// This is necessary because database/sql does not expose an interface to safely quote string literals,
+// so we are forced to inject a placeholder.
 func (s LiteralString) String(c Ctx) (string, error) { return c.StaticPlaceholder(string(s)) }
 
 type LiteralList []interface{}
@@ -192,6 +213,7 @@ func (in *InExpr) String(c Ctx) (string, error) {
 	return c.In(in)
 }
 
+// In returns an IN(...) expression. The argument can be an Expression (probably a LiteralList) or a []interface{}, in which case a number of implicit placeholders may be generated.
 func In(element interface{}, list interface{}) Expression {
 	elementEx := operandToExpression(element)
 	listEx := listToExpression(list)
@@ -212,6 +234,10 @@ func (b *Binding) IsNull(c Ctx) bool {
 	return ok && v == nil
 }
 
+// Bind returns an explicit placeholder.
+//
+// Concrete values can be specified when calling *Dbq.SQL().
+// Note that the string representation returned by *Dbq.SQL() may changed based on the values provided.
 func Bind(name string) Expression {
 	return &Expr{&Binding{name: name}}
 }
@@ -222,6 +248,7 @@ type CastExpr struct {
 	Primitive
 }
 
+// Cast returns a typecase expression.
 func Cast(e Expression, typ string) Expression {
 	return &Expr{&CastExpr{e: e, typ: typ}}
 }

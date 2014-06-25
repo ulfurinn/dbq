@@ -1,10 +1,14 @@
 package dbq
 
 type Dialect interface {
-	SQL(e Expression, v Args) (sql string, values []interface{}, err error)
+	SQL(e Expression, v Args) (sql string, values []interface{}, err error) // serializes an Expression to string and collects all placeholder bindings, explicit and implicit
 	SQLString(e Expression) (sql string, err error)
 }
 
+/*
+Ctx is the interface used by Nodes to return (possibly dialect-specific) SQL. It provides a mapping between a dbq type and an SQL subexpression.
+Ctx is used because a query may contain shared state that needs to be accessible by all Nodes (like lists of known placeholders).
+*/
 type Ctx interface {
 	Select(*SelectExpr) (string, error)
 	Column(*ColumnExpr) (string, error)

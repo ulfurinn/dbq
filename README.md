@@ -1,6 +1,7 @@
 # ulfurinn/dbq
 
 [![Build Status](https://travis-ci.org/ulfurinn/dbq.svg?branch=master)](https://travis-ci.org/ulfurinn/dbq)
+[![GoDoc](https://godoc.org/bitbucket.org/ulfurinn/dbq?status.png)](https://godoc.org/bitbucket.org/ulfurinn/dbq)
 
 ## For the love of gods, not another Go ORM
 

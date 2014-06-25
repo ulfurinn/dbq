@@ -1,11 +1,23 @@
 package dbq
 
+/*
+A Node is the basic building block in dbq. All syntax trees are built from Nodes.
+
+A Node is supposed to be able to return a string representation of itself, corresponding to an SQL subexpression.
+*/
 type Node interface {
-	String(Ctx) (string, error)
-	IsCompound() bool
+	String(Ctx) (string, error) // the string representation
+	IsCompound() bool           // used to decide when to surround subexpressions with parentheses
 }
 
+/*
+Primitive is a mixin for Node implementations that provides the IsCompound() method.
+*/
 type Primitive struct{}
+
+/*
+Compound is a mixin for Node implementations that provides the IsCompound() method.
+*/
 type Compound struct{}
 
 func (Primitive) IsCompound() bool { return false }
