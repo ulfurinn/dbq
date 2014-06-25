@@ -44,7 +44,7 @@ func (s *SelectExpr) parseSelect(specs []interface{}) {
 			s.columns = append(s.columns, Ident(spec))
 		case Distinct:
 			s.distinct = true
-		case Node:
+		case Expression:
 			s.columns = append(s.columns, spec)
 		}
 	}
