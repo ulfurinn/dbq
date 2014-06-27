@@ -21,6 +21,7 @@ type SelectExpr struct {
 	columns       []Node
 	tables        []Node
 	conditions    []Expression
+	group         []Expression
 	order         Node
 	limit, offset uint
 	Compound
@@ -191,6 +192,22 @@ func (s *SelectQuery) Where(specs ...interface{}) *SelectQuery {
 	}
 	return s
 }
+
+func (s *SelectQuery) Group(exprs ...interface{}) *SelectQuery {
+	ex := s.expr()
+	for _, e := range exprs {
+		switch e := e.(type) {
+		case string:
+			ex.group = append(ex.group, Ident(e))
+		case Expression:
+			ex.group = append(ex.group, e)
+		default:
+			panic(fmt.Errorf("cannot use %v [%v] in a group clause", e, reflect.TypeOf(e)))
+		}
+	}
+	return s
+}
+
 func (s *SelectQuery) Limit(l uint) *SelectQuery {
 	ex := s.expr()
 	ex.limit = l

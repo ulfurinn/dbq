@@ -130,6 +130,17 @@ func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
 		}
 		sql += " WHERE " + conditionSQL
 	}
+	if len(s.group) > 0 {
+		groups := []string{}
+		for _, g := range s.group {
+			group, err := g.String(c)
+			if err != nil {
+				return "", err
+			}
+			groups = append(groups, group)
+		}
+		sql += " GROUP BY " + strings.Join(groups, ", ")
+	}
 	if s.order != nil {
 		order, err := s.order.String(c)
 		if err != nil {

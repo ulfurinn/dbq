@@ -165,6 +165,13 @@ var _ = Describe("dbq", func() {
 			})
 		})
 
+		Describe("Group()", func() {
+			It("should use expressions", func() {
+				e := q.Select().From("t").Group("a")
+				Expect(Q(e)).To(Equal("SELECT * FROM t GROUP BY a"))
+			})
+		})
+
 		Describe("Order()", func() {
 			It("should sort by expression", func() {
 				e := q.Select().From("t").OrderBy(Order("x", "asc"))
