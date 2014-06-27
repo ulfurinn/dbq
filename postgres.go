@@ -86,13 +86,13 @@ func (c *PostgresCtx) Column(col *ColumnExpr) (sql string, err error) {
 	return fmt.Sprintf(`"%s"."%s"`, col.table.Name(), col.column), nil
 }
 
-func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
-	sql = "SELECT "
+func (c *PostgresCtx) Select(s *SelectExpr) (query string, err error) {
+	sql := []string{"SELECT"}
 	if s.distinct {
-		sql += "DISTINCT "
+		sql = append(sql, "DISTINCT")
 	}
 	if s.isSelectStar() {
-		sql += "*"
+		sql = append(sql, "*")
 	} else {
 		columns := []string{}
 		for _, col := range s.columns {
@@ -102,7 +102,7 @@ func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
 			}
 			columns = append(columns, sql)
 		}
-		sql += strings.Join(columns, ", ")
+		sql = append(sql, strings.Join(columns, ", "))
 	}
 	if len(s.tables) > 0 {
 		tables := []string{}
@@ -117,7 +117,7 @@ func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
 			}
 			tables = append(tables, tableSQL)
 		}
-		sql += " FROM " + strings.Join(tables, " ")
+		sql = append(sql, "FROM", strings.Join(tables, " "))
 	}
 	if len(s.conditions) > 0 {
 		acc := s.conditions[0]
@@ -128,7 +128,7 @@ func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
 		if err != nil {
 			return "", err
 		}
-		sql += " WHERE " + conditionSQL
+		sql = append(sql, "WHERE", conditionSQL)
 	}
 	if len(s.group) > 0 {
 		groups := []string{}
@@ -139,22 +139,22 @@ func (c *PostgresCtx) Select(s *SelectExpr) (sql string, err error) {
 			}
 			groups = append(groups, group)
 		}
-		sql += " GROUP BY " + strings.Join(groups, ", ")
+		sql = append(sql, "GROUP BY", strings.Join(groups, ", "))
 	}
 	if s.order != nil {
 		order, err := s.order.String(c)
 		if err != nil {
 			return "", nil
 		}
-		sql += order
+		sql = append(sql, order)
 	}
 	if s.limit > 0 {
-		sql += fmt.Sprintf(" LIMIT %d", s.limit)
+		sql = append(sql, fmt.Sprintf("LIMIT %d", s.limit))
 	}
 	if s.offset > 0 {
-		sql += fmt.Sprintf(" OFFSET %d", s.offset)
+		sql = append(sql, fmt.Sprintf("OFFSET %d", s.offset))
 	}
-	return
+	return strings.Join(sql, " "), nil
 }
 
 func (c *PostgresCtx) Alias(alias *AliasExpr) (sql string, err error) {
@@ -323,6 +323,7 @@ func (c *PostgresCtx) AggFunc(f *AggFuncExpr) (sql string, err error) {
 		if err != nil {
 			return
 		}
+		order = " " + order
 	}
 	return f.name + "(" + qualifier + strings.Join(args, ", ") + order + ")", nil
 }
@@ -345,6 +346,6 @@ func (c *PostgresCtx) OrderBy(order *OrderExpr) (sql string, err error) {
 		}
 		parts = append(parts, part)
 	}
-	sql = " ORDER BY " + strings.Join(parts, ", ")
+	sql = "ORDER BY " + strings.Join(parts, ", ")
 	return
 }
